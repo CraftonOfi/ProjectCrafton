@@ -9,7 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
       - name: Pub get
         working-directory: mobile
         run: flutter pub get
