@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "flutter-run-web-on-8080",
+			"type": "shell",
+			"command": "flutter run -d chrome --web-hostname 127.0.0.1 --web-port 8080",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

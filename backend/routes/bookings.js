@@ -4,6 +4,29 @@ const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const { sendPushToTokens } = require('../services/pushService');
+async function notify(userId, title, message, type = 'GENERAL') {
+  try {
+    await prisma.notification.create({
+      data: { userId, title, message, type },
+    });
+    // Intentar enviar push si hay tokens activos
+    const hasDeviceDelegate = prisma && Object.prototype.hasOwnProperty.call(prisma, 'deviceToken');
+    if (hasDeviceDelegate) {
+      const tokens = await prisma.deviceToken.findMany({
+        where: { userId, isActive: true },
+        select: { token: true },
+      });
+      const list = tokens.map((t) => t.token);
+      if (list.length > 0) {
+        // No bloquear el request si falla el envío; ejecutar en background
+        sendPushToTokens(list, { title, body: message }, { type }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.warn('[notify] failed', e.message);
+  }
+}
 
 // Helpers de adaptación para que el backend entregue el shape que consume el móvil
 const parseSpecifications = (raw) => {
@@ -33,6 +56,75 @@ const adaptResource = (resource) => {
     // owner es opcional en el móvil; podemos omitirlo o incluir un resumen.
   };
 };
+
+// GET /api/bookings/admin/all - Listar todas las reservas (solo admin)
+router.get('/admin/all', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { status, userId, resourceId, page = 1, limit = 20, search } = req.query;
+
+    const where = {
+      ...(status && { status }),
+      ...(userId && { userId: parseInt(userId) }),
+      ...(resourceId && { resourceId: parseInt(resourceId) }),
+      ...(search && typeof search === 'string' && search.trim()
+        ? {
+            OR: [
+              { user: { name: { contains: search } } },
+              { user: { email: { contains: search } } },
+              { resource: { name: { contains: search } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        include: {
+          resource: { include: { images: { select: { url: true } } } },
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.booking.count({ where }),
+    ]);
+
+    const bookings = rows.map((b) => ({
+      ...b,
+      startTime: b.startDate,
+      endTime: b.endDate,
+      totalHours: b.totalHours,
+      totalPrice: b.totalPrice,
+      notes: b.notes,
+      resource: adaptResource(b.resource),
+    }));
+
+    res.json({
+      bookings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Error listando reservas admin:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
 // GET /api/bookings - Obtener reservas del usuario
 router.get('/', authenticate, async (req, res) => {
@@ -72,19 +164,25 @@ router.get('/', authenticate, async (req, res) => {
     const total = await prisma.booking.count({ where });
 
     // Helper para derivar el estado dinámico de una reserva según el tiempo actual
+    // Respeta cuando un admin marcó una reserva como IN_PROGRESS antes de hora
+    // (no la "degrada" a CONFIRMED), pero la completa al finalizar.
     const deriveStatus = (bk) => {
       const now = new Date();
-  const start = new Date(bk.startDate);
-  const end = new Date(bk.endDate);
+      const start = new Date(bk.startDate);
+      const end = new Date(bk.endDate);
 
       // Estados terminales / finales no cambian
       if (['CANCELLED', 'REFUNDED', 'COMPLETED'].includes(bk.status)) return bk.status;
 
-      // Si ya terminó
+      // Si está marcada como en curso por admin, respetar hasta que termine
+      if (bk.status === 'IN_PROGRESS') {
+        if (now >= end) return 'COMPLETED';
+        return 'IN_PROGRESS';
+      }
+
+      // Para PENDING/CONFIRMED derivar automáticamente
       if (now >= end) return 'COMPLETED';
-      // Si está en ventana activa
       if (now >= start && now < end) return 'IN_PROGRESS';
-      // Futuro siempre confirmado (auto-confirm)
       return 'CONFIRMED';
     };
 
@@ -222,6 +320,9 @@ router.post('/', authenticate, async (req, res) => {
       resource: adaptResource(bookingRaw.resource),
     };
 
+    // Notificar creación de reserva
+    notify(req.user.id, 'Reserva creada', `Tu reserva para ${resource.name} fue creada y confirmada.`, 'BOOKING_CONFIRMED');
+
     res.status(201).json({
       message: 'Reserva creada exitosamente',
       booking
@@ -272,13 +373,17 @@ router.get('/:id', authenticate, async (req, res) => {
 
     // Derivar y persistir estado dinámico para la reserva individual
     const now = new Date();
-  const start = new Date(booking.startDate);
-  const end = new Date(booking.endDate);
+    const start = new Date(booking.startDate);
+    const end = new Date(booking.endDate);
     let newStatus = booking.status;
     if (!['CANCELLED', 'REFUNDED', 'COMPLETED'].includes(booking.status)) {
-      if (now >= end) newStatus = 'COMPLETED';
-      else if (now >= start && now < end) newStatus = 'IN_PROGRESS';
-      else newStatus = 'CONFIRMED';
+      if (booking.status === 'IN_PROGRESS') {
+        newStatus = now >= end ? 'COMPLETED' : 'IN_PROGRESS';
+      } else {
+        if (now >= end) newStatus = 'COMPLETED';
+        else if (now >= start && now < end) newStatus = 'IN_PROGRESS';
+        else newStatus = 'CONFIRMED';
+      }
     }
     if (newStatus !== booking.status) {
       try {
@@ -316,22 +421,38 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
       });
     }
 
-    const booking = await prisma.booking.update({
+    const bookingRaw = await prisma.booking.update({
       where: { id: parseInt(req.params.id) },
       data: { status },
       include: {
-        resource: {
-          select: { name: true, type: true }
-        },
-        user: {
-          select: { name: true, email: true }
-        }
+        resource: { include: { images: { select: { url: true } } } }
       }
     });
 
+    const booking = {
+      ...bookingRaw,
+      startTime: bookingRaw.startDate,
+      endTime: bookingRaw.endDate,
+      totalHours: bookingRaw.totalHours,
+      totalPrice: bookingRaw.totalPrice,
+      notes: bookingRaw.notes,
+      resource: adaptResource(bookingRaw.resource),
+    };
+
+    // Notificar al usuario
+    const userId = bookingRaw.userId;
+    let title = 'Reserva actualizada';
+    let msg = `El estado de tu reserva #${bookingRaw.id} cambió a ${status}.`;
+    if (status === 'CONFIRMED') { title = 'Reserva confirmada'; }
+    if (status === 'IN_PROGRESS') { title = 'Reserva en curso'; }
+    if (status === 'COMPLETED') { title = 'Reserva completada'; }
+    if (status === 'CANCELLED') { title = 'Reserva cancelada'; }
+    if (status === 'REFUNDED') { title = 'Reserva reembolsada'; }
+    notify(userId, title, msg, 'GENERAL');
+
     res.json({
       message: 'Estado de reserva actualizado',
-      booking
+      booking,
     });
 
   } catch (error) {

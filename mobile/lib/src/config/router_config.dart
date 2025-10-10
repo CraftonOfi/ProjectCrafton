@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../providers/auth_provider.dart';
 
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -18,6 +19,9 @@ import '../screens/booking/booking_confirmation_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/misc/not_found_screen.dart';
+import '../screens/notifications/notifications_screen.dart';
+import '../screens/chat/chat_screen.dart';
+import '../screens/chat/admin_threads_screen.dart';
 
 class AppRouterConfig {
   // ===== Path constants (centralizado para evitar typos) =====
@@ -34,6 +38,9 @@ class AppRouterConfig {
   static const bookingConfirmationPath = '/booking-confirmation/:bookingId';
   static const profilePath = '/profile';
   static const adminPath = '/admin';
+  static const notificationsPath = '/notifications';
+  static const chatPath = '/chat';
+  static const adminChatPath = '/admin/chat';
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -125,9 +132,24 @@ class AppRouterConfig {
             builder: (context, state) => const ProfileScreen(),
           ),
           GoRoute(
+            path: notificationsPath,
+            name: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: chatPath,
+            name: 'chat',
+            builder: (context, state) => const ChatScreen(),
+          ),
+          GoRoute(
             path: adminPath,
             name: 'admin',
             builder: (context, state) => const AdminDashboardScreen(),
+          ),
+          GoRoute(
+            path: adminChatPath,
+            name: 'admin-chat',
+            builder: (context, state) => const AdminThreadsScreen(),
           ),
           GoRoute(
             path: '/admin/resources',
@@ -160,6 +182,25 @@ class AppRouterConfig {
   );
 
   static String? _redirect(BuildContext context, GoRouterState state) {
+    // Guardas simples: requiere login y admin para /admin
+    final container = ProviderScope.containerOf(context, listen: false);
+    final isAuth = container.read(isAuthenticatedProvider);
+    final isAdmin = container.read(isAdminProvider);
+
+    final loc = state.matchedLocation;
+    if (!isAuth &&
+        loc != loginPath &&
+        loc != registerPath &&
+        loc != forgotPasswordPath &&
+        loc != splashPath) {
+      return loginPath;
+    }
+    if (isAuth && loc == loginPath) {
+      return homePath;
+    }
+    if (loc.startsWith('/admin') && !isAdmin) {
+      return homePath;
+    }
     return null;
   }
 }
@@ -175,50 +216,55 @@ class MainNavigationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isAdmin = ref.watch(isAdminProvider);
+    final items = <BottomNavigationBarItem>[
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.home_outlined),
+        activeIcon: Icon(Icons.home),
+        label: 'Inicio',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.book_outlined),
+        activeIcon: Icon(Icons.book),
+        label: 'Mis Reservas',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person),
+        label: 'Perfil',
+      ),
+      if (isAdmin)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.admin_panel_settings_outlined),
+          activeIcon: Icon(Icons.admin_panel_settings),
+          label: 'Admin',
+        ),
+    ];
+
     return Scaffold(
       body: child,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _calculateSelectedIndex(context),
-        onTap: (index) => _onItemTapped(index, context),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Mis Reservas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.admin_panel_settings_outlined),
-            activeIcon: Icon(Icons.admin_panel_settings),
-            label: 'Admin',
-          ),
-        ],
+        currentIndex: _calculateSelectedIndex(context, isAdmin: isAdmin),
+        onTap: (index) => _onItemTapped(index, context, isAdmin: isAdmin),
+        items: items,
       ),
     );
   }
 
-  static int _calculateSelectedIndex(BuildContext context) {
+  static int _calculateSelectedIndex(BuildContext context,
+      {required bool isAdmin}) {
     final String location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/home')) {
       return 0; // includes /home/search & /home/resource/:id
     }
     if (location.startsWith('/my-bookings')) return 1;
     if (location.startsWith('/profile')) return 2;
-    if (location.startsWith('/admin')) return 3;
+    if (isAdmin && location.startsWith('/admin')) return 3;
     return 0;
   }
 
-  void _onItemTapped(int index, BuildContext context) {
+  void _onItemTapped(int index, BuildContext context, {required bool isAdmin}) {
     switch (index) {
       case 0:
         GoRouter.of(context).go('/home');
@@ -230,7 +276,7 @@ class MainNavigationScreen extends ConsumerWidget {
         GoRouter.of(context).go('/profile');
         break;
       case 3:
-        GoRouter.of(context).go('/admin');
+        if (isAdmin) GoRouter.of(context).go('/admin');
         break;
     }
   }

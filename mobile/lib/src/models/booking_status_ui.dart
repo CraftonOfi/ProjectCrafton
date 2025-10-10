@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'booking_model.dart';
+import '../config/theme_config.dart';
 
 Color bookingStatusColor(BookingStatus status) {
   switch (status) {
     case BookingStatus.pending:
-      return Colors.orange;
+      return AppColors.accent; // amber
     case BookingStatus.confirmed:
-      return Colors.blue;
+      return AppColors.info; // blue
     case BookingStatus.inProgress:
-      return Colors.green;
+      return AppColors.success; // green
     case BookingStatus.completed:
-      return Colors.grey;
+      return AppColors.grey500; // softer grey
     case BookingStatus.cancelled:
-      return Colors.red;
+      return AppColors.error; // red
     case BookingStatus.refunded:
-      return Colors.purple;
+      return AppColors.secondary; // green teal
   }
 }
 

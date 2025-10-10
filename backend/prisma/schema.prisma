@@ -26,6 +26,10 @@ model User {
   payments     Payment[]
   notifications Notification[]
   resources    Resource[]
+  deviceTokens DeviceToken[]
+  refreshTokens RefreshToken[]
+  messagesSent Message[] @relation("messages_from")
+  messagesRecv Message[] @relation("messages_to")
   
   @@map("users")
 }
@@ -78,6 +82,7 @@ model Booking {
   user     User      @relation(fields: [userId], references: [id])
   resource Resource  @relation(fields: [resourceId], references: [id])
   payments Payment[]
+  messages Message[]
   
   @@map("bookings")
 }
@@ -111,4 +116,75 @@ model Notification {
   user User @relation(fields: [userId], references: [id])
   
   @@map("notifications")
+}
+
+// Tokens de dispositivo para notificaciones push (FCM)
+model DeviceToken {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  token      String   @unique
+  platform   String?  // "android" | "ios" | "web" (informativo)
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@map("device_tokens")
+}
+
+// Refresh tokens por dispositivo
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  token       String    @unique
+  deviceLabel String?
+  deviceTokenId Int?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+
+  user        User      @relation(fields: [userId], references: [id])
+  deviceToken DeviceToken? @relation(fields: [deviceTokenId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// Mensajería básica (chat) entre usuarios (cliente <-> admin)
+model Message {
+  id         Int      @id @default(autoincrement())
+  fromUserId Int
+  toUserId   Int
+  body       String
+  read       Boolean  @default(false)
+  bookingId  Int?
+  createdAt  DateTime @default(now())
+  
+  // Relaciones
+  fromUser User   @relation("messages_from", fields: [fromUserId], references: [id])
+  toUser   User   @relation("messages_to", fields: [toUserId], references: [id])
+  booking  Booking? @relation(fields: [bookingId], references: [id])
+  attachments MessageAttachment[]
+  
+  @@index([toUserId, read])
+  @@index([fromUserId, toUserId, createdAt])
+  @@map("messages")
+}
+
+// Adjuntos de mensajes (URLs hacia almacenamiento externo)
+model MessageAttachment {
+  id         Int      @id @default(autoincrement())
+  messageId  Int
+  url        String
+  type       String?  // image/png, application/pdf, etc.
+  createdAt  DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_attachments")
 }

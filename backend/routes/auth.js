@@ -1,12 +1,25 @@
 // ...existing code...
 // ...existing code...
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
+const { authenticate } = require('../middleware');
+const crypto = require('crypto');
 
 const router = express.Router();
+// Rate limit dedicado a login: 5 req/5min por IP
+const loginLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos de login, intenta más tarde' },
+});
+// Inicializar Prisma antes de cualquier uso en rutas
+const prisma = new PrismaClient();
 // POST /api/auth/create-demo
 router.post('/create-demo', async (req, res) => {
   try {
@@ -52,7 +65,6 @@ router.post('/create-demo', async (req, res) => {
     await prisma.$disconnect();
   }
 });
-const prisma = new PrismaClient();
 
 // Función para generar JWT
 const generateToken = (userId, role) => {
@@ -61,6 +73,13 @@ const generateToken = (userId, role) => {
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
+};
+
+const generateRefreshToken = async (userId, deviceLabel, deviceTokenId) => {
+  const token = crypto.randomBytes(48).toString('hex');
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30); // 30 días
+  await prisma.refreshToken.create({ data: { userId, token, deviceLabel, deviceTokenId: deviceTokenId || null, expiresAt } });
+  return { token, expiresAt };
 };
 
 // Validaciones
@@ -147,11 +166,16 @@ router.post('/register', registerValidation, async (req, res) => {
 
     // Generar token
     const token = generateToken(user.id, user.role);
+    const deviceLabel = req.headers['x-device-name']?.toString();
+    const deviceToken = (await prisma.deviceToken.findFirst({ where: { userId: user.id, isActive: true }, select: { id: true }, orderBy: { updatedAt: 'desc' } })) || null;
+    const refresh = await generateRefreshToken(user.id, deviceLabel, deviceToken?.id);
 
     res.status(201).json({
       message: 'Usuario creado exitosamente',
       user,
-      token
+      token,
+      refreshToken: refresh.token,
+      refreshTokenExpiresAt: refresh.expiresAt
     });
 
   } catch (error) {
@@ -173,7 +197,7 @@ router.post('/register', registerValidation, async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', loginValidation, async (req, res) => {
+router.post('/login', loginLimiter, loginValidation, async (req, res) => {
   try {
     // Validar entrada
     const errors = validationResult(req);
@@ -286,13 +310,38 @@ router.post('/verify-token', async (req, res) => {
   }
 });
 
-// POST /api/auth/change-password
-router.post('/change-password', async (req, res) => {
+// POST /api/auth/refresh
+router.post('/refresh', async (req, res) => {
   try {
-    const { token, currentPassword, newPassword } = req.body;
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) return res.status(400).json({ error: 'refreshToken requerido' });
+    const rt = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+    if (!rt || rt.revokedAt || rt.expiresAt <= new Date()) {
+      return res.status(401).json({ error: 'refreshToken inválido' });
+    }
+    const user = await prisma.user.findUnique({ where: { id: rt.userId } });
+    if (!user || !user.isActive) return res.status(401).json({ error: 'Usuario inactivo' });
+    const token = generateToken(user.id, user.role);
+    return res.json({ token });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
-    // Validar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+// POST /api/auth/logout-all-devices
+router.post('/logout-all-devices', authenticate, async (req, res) => {
+  try {
+    await prisma.refreshToken.updateMany({ where: { userId: req.user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// POST /api/auth/change-password
+router.post('/change-password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
     
     // Validar nueva contraseña
     if (!newPassword || newPassword.length < 6) {
@@ -303,7 +352,7 @@ router.post('/change-password', async (req, res) => {
 
     // Buscar usuario
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId }
+      where: { id: req.user.id }
     });
 
     if (!user) {

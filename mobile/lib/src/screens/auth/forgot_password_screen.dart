@@ -13,7 +13,8 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
@@ -23,8 +24,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Recuperar Contraseña'),
         backgroundColor: Colors.transparent,
@@ -37,19 +38,30 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 40.h),
-              
+
               // Header
               _buildHeader(),
-              
+
               SizedBox(height: 40.h),
-              
+
               // Content based on state
               if (!_emailSent) ...[
-                _buildRequestForm(),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.grey800 : Colors.white,
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(
+                      color: isDark ? AppColors.grey700 : AppColors.grey200,
+                    ),
+                  ),
+                  child: _buildRequestForm(),
+                ),
               ] else ...[
                 _buildSuccessMessage(),
               ],
-              
+
               SizedBox(height: 32.h),
             ],
           ),
@@ -76,26 +88,26 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             color: AppColors.primary,
           ),
         ),
-        
+
         SizedBox(height: 24.h),
-        
+
         Text(
           _emailSent ? '¡Email Enviado!' : '¿Olvidaste tu contraseña?',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
         ),
-        
+
         SizedBox(height: 8.h),
-        
+
         Text(
-          _emailSent 
-            ? 'Hemos enviado las instrucciones para restablecer tu contraseña a tu email.'
-            : 'No te preocupes, te ayudaremos a recuperar el acceso a tu cuenta.',
+          _emailSent
+              ? 'Hemos enviado las instrucciones para restablecer tu contraseña a tu email.'
+              : 'No te preocupes, te ayudaremos a recuperar el acceso a tu cuenta.',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppColors.textSecondary,
-          ),
+                color: AppColors.textSecondary,
+              ),
         ),
       ],
     );
@@ -115,9 +127,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               height: 1.5,
             ),
           ),
-          
+
           SizedBox(height: 32.h),
-          
+
           // Email
           CustomTextField(
             name: 'email',
@@ -126,14 +138,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.done,
             validators: [
-              FormBuilderValidators.required(errorText: 'El email es requerido'),
+              FormBuilderValidators.required(
+                  errorText: 'El email es requerido'),
               FormBuilderValidators.email(errorText: 'Ingresa un email válido'),
             ],
             onSubmitted: (_) => _handleSendResetEmail(),
           ),
-          
+
           SizedBox(height: 32.h),
-          
+
           // Botón de enviar
           CustomButton(
             text: 'Enviar Enlace de Recuperación',
@@ -141,9 +154,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             isLoading: _isLoading,
             width: double.infinity,
           ),
-          
+
           SizedBox(height: 24.h),
-          
+
           // Enlace para volver a login
           Center(
             child: TextButton(
@@ -180,9 +193,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             color: AppColors.success,
           ),
         ),
-        
+
         SizedBox(height: 24.h),
-        
+
         Text(
           'Revisa tu bandeja de entrada',
           style: TextStyle(
@@ -191,21 +204,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        
+
         SizedBox(height: 12.h),
-        
+
         Text(
-           'Si no encuentras el email en tu bandeja de entrada, revisa la carpeta de spam.',
-           textAlign: TextAlign.center,
-           style: TextStyle(
-             fontSize: 14.sp,
-             color: AppColors.textSecondary,
-             height: 1.5,
-           ),
-         ),
-        
+          'Si no encuentras el email en tu bandeja de entrada, revisa la carpeta de spam.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14.sp,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+
         SizedBox(height: 32.h),
-        
+
         // Botón para reenviar
         CustomOutlineButton(
           text: 'Reenviar Email',
@@ -216,9 +229,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           },
           width: double.infinity,
         ),
-        
+
         SizedBox(height: 16.h),
-        
+
         // Botón para volver a login
         CustomButton(
           text: 'Volver al Inicio de Sesión',
@@ -231,7 +244,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   Future<void> _handleSendResetEmail() async {
     if (!(_formKey.currentState?.saveAndValidate() ?? false)) return;
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -256,7 +269,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           backgroundColor: AppColors.success,
         ),
       );
-
     } catch (e) {
       setState(() {
         _isLoading = false;

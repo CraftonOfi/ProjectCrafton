@@ -84,8 +84,8 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
 
     const where = search ? {
       OR: [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { email: { contains: search } }
       ]
     } : {};
 

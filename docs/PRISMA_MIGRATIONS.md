@@ -1,3 +1,35 @@
+# Prisma Migrations
+
+## Migración a Postgres
+
+1. Actualiza `datasource db` en `backend/prisma/schema.prisma`:
+
+```
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+2. Establece `DATABASE_URL` con formato:
+
+```
+postgresql://USER:PASSWORD@HOST:PORT/DBNAME?schema=public
+```
+
+3. Ejecuta migraciones:
+
+```
+npm run generate
+npm run migrate
+```
+
+4. Verifica índices:
+- `messages`: `@@index([toUserId, read])` y `@@index([fromUserId, toUserId, createdAt])`
+- `refresh_tokens`: índices por `userId` y `expiresAt`
+
+5. Revisa datos existentes: migra desde SQLite si aplica (dump/import).
+
 # Prisma Migrations & Dev DB
 
 This project uses Prisma with SQLite for development.

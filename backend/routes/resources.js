@@ -177,6 +177,110 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/resources/admin - Listar recursos (incluyendo inactivos) solo admin
+router.get('/admin', authenticate, requireAdmin, async (req, res) => {
+  const startTs = Date.now();
+  try {
+    const { status = 'active', type, types, location, locations, search, minPrice, maxPrice, sort, page = 1, limit = 20 } = req.query;
+
+    // where base según status
+    let where = {};
+    if (String(status).toLowerCase() === 'active') where.isActive = true;
+    else if (String(status).toLowerCase() === 'inactive') where.isActive = false;
+    // 'all' => sin filtro de isActive
+
+    // Reutilizar normalizaciones del handler público
+    const normalizeTypes = (t) => {
+      const up = String(t).toUpperCase();
+      if (up === 'STORAGESPACE') return 'STORAGE_SPACE';
+      if (up === 'LASERMACHINE') return 'LASER_MACHINE';
+      if (['STORAGE_SPACE','LASER_MACHINE'].includes(up)) return up;
+      return undefined;
+    };
+    const collectedTypes = new Set();
+    if (type) { const t = normalizeTypes(type); if (t) collectedTypes.add(t); }
+    if (types) {
+      const arr = Array.isArray(types) ? types : String(types).split(',');
+      arr.forEach((t) => { const n = normalizeTypes(t); if (n) collectedTypes.add(n); });
+    }
+    if (collectedTypes.size) where.type = { in: Array.from(collectedTypes) };
+
+    const collectedLocations = new Set();
+    const addLoc = (loc) => { if (!loc) return; const s = String(loc).trim(); if (s) collectedLocations.add(s); };
+    addLoc(location);
+    if (locations) {
+      const arr = Array.isArray(locations) ? locations : String(locations).split(',');
+      arr.forEach(addLoc);
+    }
+    if (collectedLocations.size === 1) {
+      where.location = { contains: Array.from(collectedLocations)[0] };
+    } else if (collectedLocations.size > 1) {
+      where.AND = [ ...(where.AND || []), { OR: Array.from(collectedLocations).map(l => ({ location: { contains: l } })) } ];
+    }
+
+    const priceFilters = [];
+    const minP = parseFloat(minPrice);
+    const maxP = parseFloat(maxPrice);
+    if (!isNaN(minP)) priceFilters.push({ pricePerHour: { gte: minP } });
+    if (!isNaN(maxP)) priceFilters.push({ pricePerHour: { lte: maxP } });
+    if (priceFilters.length) where.AND = [ ...(where.AND || []), ...priceFilters ];
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim();
+      where.AND = [ ...(where.AND || []), { OR: [ { name: { contains: term } }, { description: { contains: term } }, { location: { contains: term } } ] } ];
+    }
+
+    let orderBy = { createdAt: 'desc' };
+    if (typeof sort === 'string') {
+      const s = sort.toLowerCase();
+      if (s === 'price_asc') orderBy = { pricePerHour: 'asc' };
+      else if (s === 'price_desc') orderBy = { pricePerHour: 'desc' };
+      else if (s === 'created_asc') orderBy = { createdAt: 'asc' };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const [resources, total] = await Promise.all([
+      prisma.resource.findMany({
+        where,
+        include: { owner: { select: { id: true, name: true, email: true, role: true } }, images: true, _count: { select: { bookings: true } } },
+        orderBy,
+        skip,
+        take,
+      }),
+      prisma.resource.count({ where }),
+    ]);
+
+    const mapped = resources.map(r => ({
+      id: r.id.toString(),
+      name: r.name,
+      description: r.description ?? '',
+      type: r.type,
+      pricePerHour: r.pricePerHour ?? 0,
+      location: r.location,
+      capacity: r.capacity,
+      specifications: safeParseJSON(r.specifications),
+      images: r.images.map(img => img.url),
+      isActive: r.isActive,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      ownerId: r.ownerId?.toString() ?? '0',
+      owner: r.owner ? { id: r.owner.id, email: r.owner.email, name: r.owner.name, role: r.owner.role, isActive: true, phone: null, createdAt: r.createdAt, updatedAt: r.updatedAt } : null,
+    }));
+
+    const durationMs = Date.now() - startTs;
+    console.log('[resources:admin] success', { count: mapped.length, total, durationMs, where, orderBy });
+    res.json({
+      resources: mapped,
+      pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / parseInt(limit)) }
+    });
+  } catch (error) {
+    console.error('[resources:admin] error', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // GET /api/resources/:id - Obtener recurso específico
 router.get('/:id', async (req, res) => {
   try {
@@ -292,6 +396,107 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     res.status(201).json({ message: 'Recurso creado exitosamente', resource: mapped });
   } catch (error) {
     console.error('Error creando recurso:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// PUT /api/resources/:id - Actualizar recurso (solo admin)
+router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const {
+      name,
+      description,
+      pricePerHour,
+      location,
+      capacity,
+      specifications,
+      images,
+      isActive,
+    } = req.body;
+
+    // Build update data
+    const data = {};
+    if (typeof name === 'string') data.name = name;
+    if (typeof description === 'string') data.description = description;
+    if (typeof pricePerHour === 'number') data.pricePerHour = pricePerHour;
+    if (typeof location === 'string') data.location = location;
+    if (typeof capacity === 'string') data.capacity = capacity;
+    if (typeof isActive === 'boolean') data.isActive = isActive;
+    if (typeof specifications !== 'undefined') {
+      data.specifications = typeof specifications === 'string'
+        ? specifications
+        : JSON.stringify(specifications || {});
+    }
+
+    // Update main resource
+    await prisma.resource.update({ where: { id }, data });
+
+    // Replace images if provided
+    if (Array.isArray(images)) {
+      await prisma.resourceImage.deleteMany({ where: { resourceId: id } });
+      if (images.length) {
+        await prisma.resourceImage.createMany({
+          data: images.map(url => ({ url, resourceId: id }))
+        });
+      }
+    }
+
+    const updated = await prisma.resource.findUnique({
+      where: { id },
+      include: { owner: { select: { id: true, name: true, email: true, role: true } }, images: true }
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Recurso no encontrado' });
+
+    const mapped = {
+      id: updated.id.toString(),
+      name: updated.name,
+      description: updated.description ?? '',
+      type: updated.type,
+      pricePerHour: updated.pricePerHour ?? 0,
+      location: updated.location,
+      capacity: updated.capacity,
+      specifications: safeParseJSON(updated.specifications),
+      images: updated.images.map(i => i.url),
+      isActive: updated.isActive,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      ownerId: updated.ownerId?.toString() ?? '0',
+      owner: updated.owner ? {
+        id: updated.owner.id,
+        email: updated.owner.email,
+        name: updated.owner.name,
+        role: updated.owner.role,
+        isActive: true,
+        phone: null,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt
+      } : null
+    };
+
+    res.json({ message: 'Recurso actualizado exitosamente', resource: mapped });
+  } catch (error) {
+    console.error('Error actualizando recurso:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// DELETE /api/resources/:id - Desactivar recurso (soft delete) (solo admin)
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.resource.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Recurso no encontrado' });
+
+    const updated = await prisma.resource.update({
+      where: { id },
+      data: { isActive: false }
+    });
+
+    res.json({ message: 'Recurso desactivado exitosamente', id: updated.id.toString() });
+  } catch (error) {
+    console.error('Error eliminando recurso:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

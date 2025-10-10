@@ -368,9 +368,15 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       child: Container(
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: (Theme.of(context).brightness == Brightness.dark)
+              ? color.withOpacity(0.12)
+              : color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(
+            color: (Theme.of(context).brightness == Brightness.dark)
+                ? color.withOpacity(0.35)
+                : color.withOpacity(0.25),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,7 +392,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               style: TextStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
             SizedBox(height: 4.h),
@@ -394,7 +402,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               description,
               style: TextStyle(
                 fontSize: 12.sp,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ),
           ],
@@ -593,6 +603,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             context.push('/admin/reports');
           },
         ),
+        _buildAdminActionTile(
+          'Mensajes',
+          'Conversaciones con clientes',
+          Icons.chat_bubble_outline,
+          () {
+            context.push('/admin/chat');
+          },
+        ),
       ],
     );
   }
@@ -707,7 +725,9 @@ class _CreateResourceBottomSheetState
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceDark
+            : AppColors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
       padding: EdgeInsets.all(20.w),
@@ -720,7 +740,9 @@ class _CreateResourceBottomSheetState
               width: 40.w,
               height: 4.h,
               decoration: BoxDecoration(
-                color: AppColors.grey300,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.grey600
+                    : AppColors.grey300,
                 borderRadius: BorderRadius.circular(2.r),
               ),
             ),
@@ -734,7 +756,9 @@ class _CreateResourceBottomSheetState
             style: TextStyle(
               fontSize: 20.sp,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimary,
             ),
           ),
 
@@ -879,7 +903,9 @@ class _CreateResourceBottomSheetState
           style: TextStyle(
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimary,
           ),
         ),
         SizedBox(height: 8.h),
@@ -894,12 +920,16 @@ class _CreateResourceBottomSheetState
                   decoration: BoxDecoration(
                     color: _selectedType == ResourceType.storageSpace
                         ? AppColors.primary.withOpacity(0.1)
-                        : Colors.white,
+                        : (Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.grey800
+                            : Colors.white),
                     borderRadius: BorderRadius.circular(8.r),
                     border: Border.all(
                       color: _selectedType == ResourceType.storageSpace
                           ? AppColors.primary
-                          : AppColors.grey300,
+                          : (Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.grey700
+                              : AppColors.grey300),
                     ),
                   ),
                   child: Column(
@@ -919,7 +949,9 @@ class _CreateResourceBottomSheetState
                           fontWeight: FontWeight.w500,
                           color: _selectedType == ResourceType.storageSpace
                               ? AppColors.primary
-                              : AppColors.textSecondary,
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -938,12 +970,16 @@ class _CreateResourceBottomSheetState
                   decoration: BoxDecoration(
                     color: _selectedType == ResourceType.laserMachine
                         ? AppColors.secondary.withOpacity(0.1)
-                        : Colors.white,
+                        : (Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.grey800
+                            : Colors.white),
                     borderRadius: BorderRadius.circular(8.r),
                     border: Border.all(
                       color: _selectedType == ResourceType.laserMachine
                           ? AppColors.secondary
-                          : AppColors.grey300,
+                          : (Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.grey700
+                              : AppColors.grey300),
                     ),
                   ),
                   child: Column(
@@ -963,7 +999,9 @@ class _CreateResourceBottomSheetState
                           fontWeight: FontWeight.w500,
                           color: _selectedType == ResourceType.laserMachine
                               ? AppColors.secondary
-                              : AppColors.textSecondary,
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary),
                         ),
                         textAlign: TextAlign.center,
                       ),

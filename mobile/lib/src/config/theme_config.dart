@@ -77,12 +77,25 @@ class ThemeConfig {
       cardTheme: CardTheme(
         color: AppColors.surface,
         shadowColor: AppColors.grey200,
-        elevation: 2,
+        elevation: 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.r),
         ),
         margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       ),
+
+      // ListTile Theme
+      listTileTheme: ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+        iconColor: AppColors.textSecondary,
+        textColor: AppColors.textPrimary,
+      ),
+
+      dividerTheme: const DividerThemeData(
+          color: AppColors.grey200, thickness: 1, space: 1),
+
+      snackBarTheme:
+          const SnackBarThemeData(behavior: SnackBarBehavior.floating),
 
       // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -254,7 +267,34 @@ class ThemeConfig {
       // Card Theme para modo oscuro
       cardTheme: lt.cardTheme.copyWith(
         color: AppColors.surfaceDark,
-        shadowColor: Colors.black26,
+        shadowColor: Colors.black54,
+      ),
+
+      listTileTheme: lt.listTileTheme.copyWith(
+        iconColor: AppColors.textSecondaryDark,
+        textColor: AppColors.textPrimaryDark,
+      ),
+      dividerTheme: const DividerThemeData(
+          color: AppColors.grey700, thickness: 1, space: 1),
+
+      // Campos de texto más legibles en oscuro
+      inputDecorationTheme: lt.inputDecorationTheme.copyWith(
+        fillColor: AppColors.grey800,
+        hintStyle: lt.inputDecorationTheme.hintStyle?.copyWith(
+          color: AppColors.grey400,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: AppColors.grey700),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: AppColors.grey700),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+        ),
       ),
 
       // Text Theme para modo oscuro (colores legibles en fondos oscuros)

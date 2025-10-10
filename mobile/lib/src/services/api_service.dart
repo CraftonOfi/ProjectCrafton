@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_dio/sentry_dio.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -54,8 +55,14 @@ class ApiService {
 
   ApiService()
       : dio = Dio(BaseOptions(
-          baseUrl:
-              kIsWeb ? 'http://localhost:3001/api' : 'http://10.0.2.2:3001/api',
+          // Permite override en build/run: --dart-define=API_BASE_URL=http://localhost:3002/api
+          baseUrl: const String.fromEnvironment(
+            'API_BASE_URL',
+            // Use 127.0.0.1 on Web to avoid potential IPv6 localhost issues
+            defaultValue: kIsWeb
+                ? 'http://127.0.0.1:3001/api'
+                : 'http://10.0.2.2:3001/api',
+          ),
           headers: {'Content-Type': 'application/json'},
           connectTimeout: Duration(seconds: 5),
           receiveTimeout: Duration(seconds: 3),
@@ -63,10 +70,116 @@ class ApiService {
           validateStatus: (int? status) =>
               status != null && status >= 200 && status < 500,
         )) {
+    dio.addSentry();
     dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,
     ));
+
+    // Interceptor 401 -> marcar en extra para gestionar logout en capa superior
+    dio.interceptors.add(InterceptorsWrapper(onError: (e, handler) async {
+      if (e.response?.statusCode == 401) {
+        e.requestOptions.extra['__auth_401__'] = true;
+      }
+      return handler.next(e);
+    }));
+
+    // Automatic local-dev fallback: if baseUrl uses :3001 and a network error occurs,
+    // switch to :3002 and retry the request once. Helps when backend moved to 3002.
+    dio.interceptors.add(InterceptorsWrapper(onError: (e, handler) async {
+      // Retry discreto para GET una vez
+      final isGet = e.requestOptions.method.toUpperCase() == 'GET';
+      final alreadyRetried = e.requestOptions.extra['retriedOnce'] == true;
+      final isNetworkError =
+          e.response == null && e.type != DioExceptionType.badResponse;
+      if (isGet && isNetworkError && !alreadyRetried) {
+        try {
+          await Future.delayed(const Duration(milliseconds: 250));
+          final req = e.requestOptions;
+          final resp = await dio.request(
+            req.path,
+            data: req.data,
+            queryParameters: req.queryParameters,
+            options: Options(
+              method: req.method,
+              headers: req.headers,
+              responseType: req.responseType,
+              extra: {...req.extra, 'retriedOnce': true},
+            ),
+            cancelToken: req.cancelToken,
+          );
+          return handler.resolve(resp);
+        } catch (_) {}
+      }
+      final isNetworkError2 =
+          e.response == null && e.type != DioExceptionType.badResponse;
+      final alreadyRetriedFallback =
+          e.requestOptions.extra['retriedWithFallback'] == true;
+      if (isNetworkError2 && !alreadyRetriedFallback) {
+        try {
+          final current = dio.options.baseUrl;
+          final uri = Uri.tryParse(current);
+          if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+            final hosts = <String>{
+              uri.host,
+              '127.0.0.1',
+              'localhost',
+              '10.0.2.2'
+            };
+            final ports = <int>{
+              uri.port == 0 ? (uri.scheme == 'https' ? 443 : 80) : uri.port,
+              3001,
+              3002
+            };
+            // Build candidate baseUrls excluding current
+            final candidates = <Uri>[];
+            for (final h in hosts) {
+              for (final p in ports) {
+                final candidate = uri.replace(host: h, port: p);
+                if (candidate.toString() != current &&
+                    !candidates.contains(candidate)) {
+                  candidates.add(candidate);
+                }
+              }
+            }
+
+            final req = e.requestOptions;
+            for (final cand in candidates) {
+              try {
+                dio.options.baseUrl = cand.toString();
+                final opts = Options(
+                  method: req.method,
+                  headers: req.headers,
+                  contentType: req.contentType,
+                  responseType: req.responseType,
+                  followRedirects: req.followRedirects,
+                  receiveDataWhenStatusError: req.receiveDataWhenStatusError,
+                  extra: {
+                    ...req.extra,
+                    'retriedWithFallback': true,
+                  },
+                );
+                final response = await dio.request(
+                  req.path,
+                  data: req.data,
+                  queryParameters: req.queryParameters,
+                  options: opts,
+                  cancelToken: req.cancelToken,
+                  onReceiveProgress: req.onReceiveProgress,
+                  onSendProgress: req.onSendProgress,
+                );
+                return handler.resolve(response);
+              } catch (_) {
+                // try next candidate
+              }
+            }
+          }
+        } catch (_) {
+          // ignore and forward original error
+        }
+      }
+      return handler.next(e);
+    }));
   }
 
   void setToken(String? token) {

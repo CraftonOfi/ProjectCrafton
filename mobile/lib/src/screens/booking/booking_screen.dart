@@ -12,6 +12,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart' show ApiException;
+import '../../utils/format.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   final String resourceId;
@@ -180,22 +181,36 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        resource.name,
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+                      Builder(builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return Text(
+                          resource.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary,
+                          ),
+                        );
+                      }),
                       SizedBox(height: 4.h),
-                      Text(
-                        resource.typeDisplayName,
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
+                      Builder(builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return Text(
+                          resource.typeDisplayName,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary,
+                          ),
+                        );
+                      }),
                       SizedBox(height: 4.h),
                       Text(
                         resource.formattedPrice,
@@ -217,33 +232,68 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               Row(
                 children: [
                   if (resource.hasLocation) ...[
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 16.sp,
-                      color: AppColors.grey500,
-                    ),
-                    SizedBox(width: 4.w),
-                    Text(
-                      resource.location!,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: AppColors.textSecondary,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16.sp,
+                            color: AppColors.grey500,
+                          ),
+                          SizedBox(width: 4.w),
+                          Flexible(
+                            child: Builder(builder: (context) {
+                              final isDark = Theme.of(context).brightness ==
+                                  Brightness.dark;
+                              return Text(
+                                resource.location!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary,
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
                       ),
                     ),
-                    if (resource.capacity != null) SizedBox(width: 16.w),
                   ],
+                  if (resource.hasLocation && resource.capacity != null)
+                    SizedBox(width: 12.w),
                   if (resource.capacity != null) ...[
-                    Icon(
-                      Icons.straighten_outlined,
-                      size: 16.sp,
-                      color: AppColors.grey500,
-                    ),
-                    SizedBox(width: 4.w),
-                    Text(
-                      resource.capacity!,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: AppColors.textSecondary,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.straighten_outlined,
+                            size: 16.sp,
+                            color: AppColors.grey500,
+                          ),
+                          SizedBox(width: 4.w),
+                          Flexible(
+                            child: Builder(builder: (context) {
+                              final isDark = Theme.of(context).brightness ==
+                                  Brightness.dark;
+                              return Text(
+                                resource.capacity!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary,
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -370,6 +420,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             ),
           ],
         ),
+        SizedBox(height: 8.h),
+        // Atajos rápidos
+        if (_startTime == null) _quickStartShortcuts(),
+        if (_startTime != null) _quickDurationChips(),
         // Inline real-time validation messages
         if (_startTime != null) ...[
           SizedBox(height: 8.h),
@@ -391,34 +445,40 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         ],
         if (_startTime != null && _endTime != null) ...[
           SizedBox(height: 12.h),
-          Container(
-            padding: EdgeInsets.all(12.w),
-            decoration: BoxDecoration(
-              color: AppColors.info.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(color: AppColors.info.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.schedule,
-                  color: AppColors.info,
-                  size: 16.sp,
+          Builder(builder: (context) {
+            final isDark =
+                Theme.of(context).colorScheme.brightness == Brightness.dark;
+            return Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.grey50,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color: isDark ? AppColors.grey700 : AppColors.grey300,
                 ),
-                SizedBox(width: 8.w),
-                Text(
-                  'Duración: ${_calculateDuration()} horas',
-                  style: TextStyle(
-                    fontSize: 14.sp,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
                     color: AppColors.info,
-                    fontWeight: FontWeight.w500,
+                    size: 16.sp,
                   ),
-                ),
-              ],
-            ),
-          ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Duración: ${_calculateDuration()} horas',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: AppColors.info,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
           SizedBox(height: 8.h),
-          // Real-time availability indicator
+          // Real-time availability indicator (theme-aware card)
           _buildAvailabilityIndicator(),
         ],
       ],
@@ -484,8 +544,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     final duration = _calculateDuration();
     final totalPrice = duration * resource.pricePerHour;
+    final isDark = Theme.of(context).colorScheme.brightness == Brightness.dark;
 
     return Card(
+      color: isDark ? AppColors.surfaceDark : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(
+          color: isDark ? AppColors.grey700 : AppColors.grey200,
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: EdgeInsets.all(16.w),
         child: Column(
@@ -496,11 +566,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color:
+                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
               ),
             ),
             SizedBox(height: 12.h),
-            _buildSummaryRow('Fecha', _formatDate(_selectedDate)),
+            _buildSummaryRow(
+                'Fecha', Formatters.dateTime(_composeDateTime(isStart: true)!)),
             _buildSummaryRow('Horario',
                 '${_startTime!.format(context)} - ${_endTime!.format(context)}'),
             _buildSummaryRow('Duración', '$duration horas'),
@@ -530,7 +602,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 ],
               ),
             ],
-            Divider(height: 24.h),
+            Divider(
+              height: 24.h,
+              color: isDark ? AppColors.grey700 : AppColors.grey200,
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -539,11 +614,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   style: TextStyle(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                 ),
                 Text(
-                  '€${totalPrice.toStringAsFixed(2)}',
+                  Formatters.currency(totalPrice),
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w700,
@@ -568,7 +645,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             label,
             style: TextStyle(
               fontSize: 14.sp,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.brightness == Brightness.dark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
             ),
           ),
           Text(
@@ -576,7 +655,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             style: TextStyle(
               fontSize: 14.sp,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.brightness == Brightness.dark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimary,
             ),
           ),
         ],
@@ -628,7 +709,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Future<void> _selectTime(bool isStartTime) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: _suggestInitialTime(isStartTime),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -668,6 +749,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
   }
 
+  TimeOfDay _suggestInitialTime(bool isStart) {
+    final now = DateTime.now();
+    if (isStart) {
+      // Sugerir siguiente múltiplo de 30 minutos
+      final minutes = ((now.minute / 30).ceil() * 30) % 60;
+      final hour = minutes == 0 ? now.hour : now.hour;
+      final h = minutes == 0 ? hour : hour;
+      final suggested = DateTime(now.year, now.month, now.day, h, minutes);
+      final t = TimeOfDay(hour: suggested.hour, minute: suggested.minute);
+      return t;
+    } else {
+      if (_startTime != null) {
+        final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+        final endMinutes = startMinutes + 60; // por defecto +1h
+        return TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
+      }
+      return TimeOfDay.now();
+    }
+  }
+
   double _calculateDuration() {
     if (_startTime == null || _endTime == null) return 0;
 
@@ -678,22 +779,47 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final months = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre'
-    ];
+    return Formatters.dateTime(date);
+  }
 
-    return '${date.day} de ${months[date.month - 1]} de ${date.year}';
+  Widget _quickStartShortcuts() {
+    final now = DateTime.now();
+    final options = [30, 60, 120];
+    return Wrap(
+      spacing: 8.w,
+      children: options.map((m) {
+        final dt = now.add(Duration(minutes: m));
+        final t = TimeOfDay(hour: dt.hour, minute: dt.minute);
+        return ChoiceChip(
+          label: Text('Empieza ${m ~/ 60 > 0 ? '+${m ~/ 60}h' : '+${m}m'}'),
+          selected: false,
+          onSelected: (_) {
+            setState(() => _startTime = t);
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _quickDurationChips() {
+    final durations = [1, 2, 3]; // horas
+    return Wrap(
+      spacing: 8.w,
+      children: durations.map((h) {
+        final start = _composeDateTime(isStart: true);
+        return ChoiceChip(
+          label: Text('${h}h'),
+          selected: false,
+          onSelected: (_) {
+            if (start == null) return;
+            final end = start.add(Duration(hours: h));
+            setState(
+                () => _endTime = TimeOfDay(hour: end.hour, minute: end.minute));
+            _scheduleAvailabilityCheck();
+          },
+        );
+      }).toList(),
+    );
   }
 
   Future<void> _handleBooking(ResourceModel resource) async {
@@ -905,45 +1031,80 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Widget _buildAvailabilityIndicator() {
+    final isDark = Theme.of(context).colorScheme.brightness == Brightness.dark;
+
     if (_checkingAvailability) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 16.sp,
-            height: 16.sp,
-            child: const CircularProgressIndicator(strokeWidth: 2),
+      return Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.grey50,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: isDark ? AppColors.grey700 : AppColors.grey300,
           ),
-          SizedBox(width: 8.w),
-          Text(
-            'Comprobando disponibilidad...',
-            style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
-          ),
-        ],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16.sp,
+              height: 16.sp,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              'Comprobando disponibilidad...',
+              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       );
     }
     if (_availabilityError != null) {
-      return _inlineWarning(_availabilityError!, AppColors.warning);
-    }
-    if (_isAvailable == null) {
-      return const SizedBox.shrink();
-    }
-    return Row(
-      children: [
-        Icon(
-          _isAvailable == true ? Icons.check_circle : Icons.cancel,
-          size: 16.sp,
-          color: _isAvailable == true ? AppColors.success : AppColors.error,
+      return Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.warning.withOpacity(0.35)),
         ),
-        SizedBox(width: 6.w),
-        Text(
-          _isAvailable == true ? 'Horario disponible' : 'Horario no disponible',
-          style: TextStyle(
-            fontSize: 13.sp,
-            color: _isAvailable == true ? AppColors.success : AppColors.error,
-            fontWeight: FontWeight.w500,
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 16.sp, color: AppColors.warning),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: Text(
+                _availabilityError!,
+                style: TextStyle(fontSize: 13.sp, color: AppColors.warning),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_isAvailable == null) return const SizedBox.shrink();
+
+    final ok = _isAvailable == true;
+    final color = ok ? AppColors.success : AppColors.error;
+    final icon = ok ? Icons.check_circle : Icons.cancel;
+    final text = ok ? 'Horario disponible' : 'Horario no disponible';
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16.sp, color: color),
+          SizedBox(width: 8.w),
+          Text(
+            text,
+            style: TextStyle(
+                fontSize: 13.sp, color: color, fontWeight: FontWeight.w600),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

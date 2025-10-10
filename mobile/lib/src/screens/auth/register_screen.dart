@@ -31,7 +31,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (next.isAuthenticated) {
         context.go('/home');
       }
-      
+
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -42,8 +42,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     });
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Crear Cuenta'),
         backgroundColor: Colors.transparent,
@@ -56,20 +56,44 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 24.h),
-              
+
               // Header
               _buildHeader(),
-              
+
               SizedBox(height: 32.h),
-              
+
               // Formulario
-              _buildRegisterForm(authState),
-              
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.grey800 : Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: isDark ? AppColors.grey700 : AppColors.grey200,
+                  ),
+                  boxShadow: isDark
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4))
+                        ]
+                      : [
+                          BoxShadow(
+                              color: AppColors.grey200.withOpacity(0.6),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4))
+                        ],
+                ),
+                child: _buildRegisterForm(authState),
+              ),
+
               SizedBox(height: 24.h),
-              
+
               // Enlace a login
               _buildLoginLink(),
-              
+
               SizedBox(height: 32.h),
             ],
           ),
@@ -85,18 +109,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         Text(
           'Crear Nueva Cuenta',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
         ),
-        
         SizedBox(height: 8.h),
-        
         Text(
           'Únete a nuestra comunidad y accede a espacios de almacén y máquinas de corte láser',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppColors.textSecondary,
-          ),
+                color: AppColors.textSecondary,
+              ),
         ),
       ],
     );
@@ -114,14 +136,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             prefixIcon: Icons.person_outlined,
             textInputAction: TextInputAction.next,
             validators: [
-              FormBuilderValidators.required(errorText: 'El nombre es requerido'),
-              FormBuilderValidators.minLength(2, errorText: 'Mínimo 2 caracteres'),
-              FormBuilderValidators.maxLength(50, errorText: 'Máximo 50 caracteres'),
+              FormBuilderValidators.required(
+                  errorText: 'El nombre es requerido'),
+              FormBuilderValidators.minLength(2,
+                  errorText: 'Mínimo 2 caracteres'),
+              FormBuilderValidators.maxLength(50,
+                  errorText: 'Máximo 50 caracteres'),
             ],
           ),
-          
+
           SizedBox(height: 20.h),
-          
+
           // Email
           CustomTextField(
             name: 'email',
@@ -130,13 +155,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             validators: [
-              FormBuilderValidators.required(errorText: 'El email es requerido'),
+              FormBuilderValidators.required(
+                  errorText: 'El email es requerido'),
               FormBuilderValidators.email(errorText: 'Ingresa un email válido'),
             ],
           ),
-          
+
           SizedBox(height: 20.h),
-          
+
           // Teléfono (opcional)
           CustomTextField(
             name: 'phone',
@@ -145,15 +171,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
             validators: [
-                FormBuilderValidators.match(
-                  RegExp(r'^(\+34|0034|34)?[6-9][0-9]{8}$'),
-                  errorText: 'Ingresa un número de teléfono español válido',
-                ),
+              (value) {
+                if (value == null || value.toString().trim().isEmpty) {
+                  return null; // permitir vacío
+                }
+                final ok = RegExp(r'^(\+34|0034|34)?[6-9][0-9]{8}$')
+                    .hasMatch(value.toString().trim());
+                if (!ok) return 'Ingresa un número de teléfono español válido';
+                return null;
+              },
             ],
           ),
-          
+
           SizedBox(height: 20.h),
-          
+
           // Contraseña
           CustomTextField(
             name: 'password',
@@ -163,7 +194,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             textInputAction: TextInputAction.next,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 color: AppColors.grey500,
               ),
               onPressed: () {
@@ -173,11 +206,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               },
             ),
             validators: [
-              FormBuilderValidators.required(errorText: 'La contraseña es requerida'),
-              FormBuilderValidators.minLength(6, errorText: 'Mínimo 6 caracteres'),
+              FormBuilderValidators.required(
+                  errorText: 'La contraseña es requerida'),
+              FormBuilderValidators.minLength(6,
+                  errorText: 'Mínimo 6 caracteres'),
               (value) {
                 if (value == null || value.isEmpty) return null;
-                
+
                 // Validar que tenga al menos una letra y un número
                 if (!RegExp(r'^(?=.*[A-Za-z])(?=.*\d)').hasMatch(value)) {
                   return 'Debe contener al menos una letra y un número';
@@ -186,9 +221,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               },
             ],
           ),
-          
+
           SizedBox(height: 20.h),
-          
+
           // Confirmar contraseña
           CustomTextField(
             name: 'confirmPassword',
@@ -198,7 +233,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             textInputAction: TextInputAction.done,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscureConfirmPassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 color: AppColors.grey500,
               ),
               onPressed: () {
@@ -208,9 +245,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               },
             ),
             validators: [
-              FormBuilderValidators.required(errorText: 'Confirma tu contraseña'),
+              FormBuilderValidators.required(
+                  errorText: 'Confirma tu contraseña'),
               (value) {
-                final password = _formKey.currentState?.fields['password']?.value;
+                final password =
+                    _formKey.currentState?.fields['password']?.value;
                 if (value != password) {
                   return 'Las contraseñas no coinciden';
                 }
@@ -219,9 +258,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ],
             onSubmitted: (_) => _handleRegister(),
           ),
-          
+
           SizedBox(height: 24.h),
-          
+
           // Términos y condiciones
           FormBuilderCheckbox(
             name: 'acceptTerms',
@@ -256,9 +295,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
           ),
-          
+
           SizedBox(height: 32.h),
-          
+
           // Botón de registro
           CustomButton(
             text: 'Crear Cuenta',
@@ -309,7 +348,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final email = formData['email'] as String;
       final password = formData['password'] as String;
       final phoneRaw = formData['phone'];
-      final phone = phoneRaw != null && phoneRaw.toString().isNotEmpty ? phoneRaw.toString() : null;
+      final phone = phoneRaw != null && phoneRaw.toString().isNotEmpty
+          ? phoneRaw.toString()
+          : null;
 
       try {
         final apiService = ApiService();
@@ -323,7 +364,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('¡Registro exitoso! Bienvenido ${response['user']['name']}'),
+              content: Text(
+                  '¡Registro exitoso! Bienvenido ${response['user']['name']}'),
               backgroundColor: AppColors.success,
             ),
           );

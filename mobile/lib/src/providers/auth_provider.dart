@@ -1,9 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+import 'package:dio/dio.dart';
 
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import 'package:flutter/foundation.dart';
+import '../services/push_registration_service.dart';
+import '../services/fcm_service.dart';
 
 // Estado de autenticación
 class AuthState {
@@ -51,6 +55,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   AuthNotifier(this._apiService) : super(const AuthState()) {
     _initializeAuth();
+    // Escuchar 401 globales para hacer logout seguro
+    _apiService.dio.interceptors
+        .add(InterceptorsWrapper(onError: (e, handler) async {
+      if (e.requestOptions.extra['__auth_401__'] == true) {
+        await _clearAuthData();
+        state = const AuthState();
+      }
+      return handler.next(e);
+    }));
   }
 
   // Inicializar estado de autenticación al arrancar la app
@@ -129,6 +142,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isLoading: false,
         );
         _logger.i('Login exitoso: ${user.email}');
+        // Intentar registrar token FCM si disponible (no bloqueante)
+        _registerFcmTokenSafely();
         return true;
       } else {
         state = state.copyWith(
@@ -271,6 +286,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await StorageService.clearToken();
     await StorageService.clearUser();
     _apiService.clearToken(); // If not implemented, make this a no-op or remove
+  }
+
+  // Registro de token FCM (no bloqueante y tolerante a errores/ausencia de SDK)
+  Future<void> _registerFcmTokenSafely() async {
+    try {
+      if (!state.isAuthenticated) return;
+      final container = ProviderContainer();
+      final pushSvc = container.read(pushRegistrationServiceProvider);
+      final fcmService = const FcmService();
+      final token = await fcmService.requestToken();
+      if (token == null) return; // nada que registrar
+      final platform = defaultTargetPlatform.name.toLowerCase();
+      await pushSvc.registerToken(token, platform: platform);
+      fcmService.listenTokenRefresh((newToken) {
+        pushSvc.registerToken(newToken, platform: platform);
+      });
+    } catch (e) {
+      // Ignore if Firebase not configured or permission denied
+      _logger.w('FCM token registration skipped: $e');
+    }
   }
 
   // Limpiar errores

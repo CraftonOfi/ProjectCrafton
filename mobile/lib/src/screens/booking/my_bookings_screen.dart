@@ -110,49 +110,65 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
       onRefresh: () async {
         await ref.read(bookingsProvider.notifier).loadBookings(refresh: true);
       },
-      child: ListView.builder(
-        padding: EdgeInsets.all(16.w),
-        itemCount: bookings.length + (bookingsState.hasMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index >= bookings.length) {
-            // Cargar más trigger
-            ref.read(bookingsProvider.notifier).loadMoreBookings();
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: 24.h),
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.all(16.w),
+            sliver: SliverList.builder(
+              itemCount: bookings.length,
+              itemBuilder: (context, index) =>
+                  _buildBookingCard(bookings[index]),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.h),
               child: Center(
-                child: bookingsState.isLoading
-                    ? const CircularProgressIndicator()
-                    : Text(
-                        'Cargar más...',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
+                child: bookingsState.hasMore
+                    ? (bookingsState.isLoading
+                        ? const CircularProgressIndicator()
+                        : TextButton(
+                            onPressed: () => ref
+                                .read(bookingsProvider.notifier)
+                                .loadMoreBookings(),
+                            child: const Text('Cargar más'),
+                          ))
+                    : const SizedBox.shrink(),
               ),
-            );
-          }
-          final booking = bookings[index];
-          return _buildBookingCard(booking);
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 16.h),
-            Text(
-              'Cargando reservas...',
-              style: TextStyle(
-                fontSize: 16.sp,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+    return ListView.builder(
+      padding: EdgeInsets.all(16.w),
+      itemCount: 6,
+      itemBuilder: (_, __) => Card(
+        margin: EdgeInsets.only(bottom: 16.h),
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                  height: 18.h,
+                  width: 120.w,
+                  color: AppColors.grey300.withOpacity(0.25)),
+              SizedBox(height: 8.h),
+              Container(
+                  height: 14.h,
+                  width: 180.w,
+                  color: AppColors.grey300.withOpacity(0.25)),
+              SizedBox(height: 6.h),
+              Container(
+                  height: 12.h,
+                  width: 220.w,
+                  color: AppColors.grey300.withOpacity(0.25)),
+            ],
+          ),
         ),
       ),
     );
@@ -314,14 +330,21 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
               SizedBox(height: 12.h),
 
               // Nombre del recurso
-              Text(
-                booking.resource?.name ?? 'Recurso no disponible',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Text(
+                  booking.resource?.name ?? 'Recurso no disponible',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              }),
 
               SizedBox(height: 8.h),
 
@@ -357,11 +380,22 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                     color: AppColors.grey500,
                   ),
                   SizedBox(width: 4.w),
-                  Text(
-                    booking.formattedDuration,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: AppColors.textSecondary,
+                  Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withOpacity(0.08),
+                      border:
+                          Border.all(color: AppColors.info.withOpacity(0.35)),
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    child: Text(
+                      'Duración: ${booking.formattedDuration}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -373,16 +407,22 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                   width: double.infinity,
                   padding: EdgeInsets.all(8.w),
                   decoration: BoxDecoration(
-                    color: AppColors.grey50,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.grey800
+                        : AppColors.grey50,
                     borderRadius: BorderRadius.circular(6.r),
                   ),
                   child: Text(
                     booking.notes!,
                     style: TextStyle(
                       fontSize: 12.sp,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
                       fontStyle: FontStyle.italic,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -527,42 +567,63 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
   void _showCancelDialog(BookingModel booking) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancelar Reserva'),
-        content: Text(
-            '¿Estás seguro de que quieres cancelar la reserva de "${booking.resource?.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-
-              final success = await ref
-                  .read(bookingsProvider.notifier)
-                  .cancelBooking(booking.id);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    success
-                        ? 'Reserva cancelada exitosamente'
-                        : 'Error cancelando la reserva',
-                  ),
-                  backgroundColor:
-                      success ? AppColors.success : AppColors.error,
-                ),
-              );
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+          title: Text(
+            'Cancelar Reserva',
+            style: TextStyle(
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
-            child: const Text('Sí, cancelar'),
           ),
-        ],
-      ),
+          content: Text(
+            '¿Estás seguro de que quieres cancelar la reserva de "${booking.resource?.name}"?',
+            style: TextStyle(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'No',
+                style: TextStyle(
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.primary,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+
+                final success = await ref
+                    .read(bookingsProvider.notifier)
+                    .cancelBooking(booking.id);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'Reserva cancelada exitosamente'
+                          : 'Error cancelando la reserva',
+                    ),
+                    backgroundColor:
+                        success ? AppColors.success : AppColors.error,
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
+              child: const Text('Sí, cancelar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/resources_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/resource_card.dart';
+import '../../providers/notifications_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +26,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Cargar recursos al inicializar
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(resourcesProvider.notifier).loadResources(refresh: true);
+      // Precargar notificaciones para el badge
+      ref.read(notificationsProvider.notifier).load(refresh: true);
     });
   }
 
@@ -33,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final resourcesState = ref.watch(resourcesProvider);
+    final unread = ref.watch(notificationsProvider).unreadCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -44,13 +48,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notificaciones en desarrollo')),
-              );
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 4.0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined),
+                  onPressed: () {
+                    context.push('/notifications');
+                  },
+                ),
+                if (unread > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade600,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 2,
+                              offset: Offset(0, 1)),
+                        ],
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 18, minHeight: 18),
+                      child: Text(
+                        unread > 99 ? '99+' : unread.toString(),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.search),
@@ -196,16 +237,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Container(
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.surfaceDark
+              : Colors.white,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: AppColors.grey200),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.grey200.withOpacity(0.5),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.grey700
+                : AppColors.grey200,
+          ),
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? []
+              : [
+                  BoxShadow(
+                    color: AppColors.grey200.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,7 +278,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
             SizedBox(height: 4.h),
@@ -237,7 +288,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               description,
               style: TextStyle(
                 fontSize: 12.sp,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ),
           ],
@@ -405,25 +458,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return ResourceCard(
       resource: resource,
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ver detalles de "${resource.name}"'),
-            action: SnackBarAction(
-              label: 'Ver',
-              onPressed: () {
-                // TODO: Navegar a detalle
-              },
-            ),
-          ),
-        );
+        // Navegar al detalle anidado bajo /home para mantener la bottom nav
+        context.go('/home/resource/${resource.id}');
       },
       onReserve: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Reservar "${resource.name}" - Funcionalidad en desarrollo'),
-          ),
-        );
+        // Ir al flujo de reserva del recurso
+        context.go('/booking/${resource.id}');
       },
     );
   }
@@ -445,15 +485,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           width: double.infinity,
           padding: EdgeInsets.all(16.w),
           decoration: BoxDecoration(
-            color: AppColors.accent.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.grey800
+                : AppColors.accent.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.grey700
+                  : AppColors.accent.withOpacity(0.3),
+            ),
           ),
           child: Row(
             children: [
               Icon(
                 Icons.admin_panel_settings,
-                color: AppColors.accent,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.accent,
                 size: 24.sp,
               ),
               SizedBox(width: 12.w),
@@ -466,14 +514,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       style: TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       'Gestiona recursos y reservas',
                       style: TextStyle(
                         fontSize: 14.sp,
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],

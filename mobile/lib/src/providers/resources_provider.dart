@@ -47,6 +47,8 @@ class ResourcesState {
 class ResourcesNotifier extends StateNotifier<ResourcesState> {
   final ApiService _apiService;
   final Logger _logger = Logger();
+  // Memoización simple por clave de filtros
+  final Map<String, List<ResourceModel>> _cache = {};
 
   ResourcesNotifier(this._apiService) : super(const ResourcesState());
 
@@ -107,6 +109,30 @@ class ResourcesNotifier extends StateNotifier<ResourcesState> {
         queryParams['sort'] = sort;
       }
 
+      // Cache key a partir de filtros relevantes y página
+      final cacheKey = [
+        'p=${queryParams['page']}',
+        't=${type?.name}',
+        'ts=${types?.map((e) => e.name).join(',')}',
+        'loc=${location ?? ''}',
+        'locs=${locations?.join(',') ?? ''}',
+        'q=${search ?? ''}',
+        'min=${minPrice ?? ''}',
+        'max=${maxPrice ?? ''}',
+        'sort=${sort ?? ''}',
+      ].join('|');
+
+      if (refresh && _cache.containsKey(cacheKey)) {
+        final cached = _cache[cacheKey]!;
+        state = ResourcesState(
+          resources: cached,
+          isLoading: false,
+          hasMore: false,
+          currentPage: 1,
+        );
+        return;
+      }
+
       final response =
           await _apiService.get('/resources', queryParameters: queryParams);
 
@@ -141,6 +167,7 @@ class ResourcesNotifier extends StateNotifier<ResourcesState> {
             hasMore: hasMore,
             currentPage: pagination['page'],
           );
+          _cache[cacheKey] = resourcesList;
         } else {
           // Si no es refresh, agregar a la lista existente
           final updatedResources = [...state.resources, ...resourcesList];

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/bookings_provider.dart';
 import '../../models/booking_model.dart';
 import '../../models/booking_status_ui.dart';
@@ -63,8 +64,12 @@ class BookingConfirmationScreen extends ConsumerWidget {
                   Text(resource.name,
                       style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 4),
-                  Text('${resource.location} · ${resource.type}',
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Text(
+                    resource.hasLocation
+                        ? '${resource.location} · ${resource.typeDisplayName}'
+                        : resource.typeDisplayName,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                   const Divider(height: 32),
                 ],
                 Text('Detalles',
@@ -105,8 +110,8 @@ class BookingConfirmationScreen extends ConsumerWidget {
                       ),
                     ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
+                        // Navegar de forma consistente al inicio usando GoRouter
+                        context.go('/home');
                       },
                       icon: const Icon(Icons.home),
                       label: const Text('Inicio'),

@@ -456,7 +456,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildResourcesList(ResourcesState state) {
     if (state.isLoading && state.resources.isEmpty) {
-      return _buildLoadingState();
+      return ListView.builder(
+        padding: EdgeInsets.all(16.w),
+        itemCount: 6,
+        itemBuilder: (_, __) => ResourceCard.placeholder(),
+      );
     }
 
     if (state.error != null && state.resources.isEmpty) {
@@ -548,24 +552,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 16.h),
-            Text(
-              'Cargando recursos...',
-              style: TextStyle(
-                fontSize: 16.sp,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ListView.builder(
+      padding: EdgeInsets.all(16.w),
+      itemCount: 6,
+      itemBuilder: (_, __) => ResourceCard.placeholder(),
     );
   }
 

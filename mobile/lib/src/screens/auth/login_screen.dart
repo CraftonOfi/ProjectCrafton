@@ -36,29 +36,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     });
 
-    // Forzar tema claro en login independientemente del tema del sistema
-    return Theme(
-      data: ThemeConfig.lightTheme,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 24.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: 60.h),
-                // Logo/Header
-                _buildHeader(),
-                SizedBox(height: 48.h),
-                // Formulario de login
-                _buildLoginForm(authState),
-                SizedBox(height: 24.h),
-                // Enlace a registro
-                _buildRegisterLink(),
-                SizedBox(height: 32.h),
-              ],
-            ),
+    // Uso theme del sistema, con un layout más moderno
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(height: 48.h),
+              _buildHeader(),
+              SizedBox(height: 36.h),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.grey800 : Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: isDark ? AppColors.grey700 : AppColors.grey200,
+                  ),
+                  boxShadow: isDark
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4))
+                        ]
+                      : [
+                          BoxShadow(
+                              color: AppColors.grey200.withOpacity(0.6),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4))
+                        ],
+                ),
+                child: _buildLoginForm(authState),
+              ),
+              SizedBox(height: 20.h),
+              _buildRegisterLink(),
+              SizedBox(height: 24.h),
+            ],
           ),
         ),
       ),
@@ -93,19 +111,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         SizedBox(height: 24.h),
+        // Título de marca
         Text(
-          'Bienvenido',
-          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+          'CRAFTON',
+          style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2,
+                color: AppColors.primary,
               ),
         ),
-        SizedBox(height: 8.h),
+        SizedBox(height: 10.h),
         Text(
-          'Inicia sesión para acceder a tu cuenta',
+          'Inicia sesión para acceder',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
         ),
       ],
@@ -174,7 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () => context.go('/forgot-password'),
+              onPressed: () => context.push('/forgot-password'),
               child: Text(
                 '¿Olvidaste tu contraseña?',
                 style: TextStyle(
@@ -278,6 +299,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (success) {
         _showSnackBar('¡Bienvenido! Has iniciado sesión correctamente.',
             AppColors.success);
+        // Navegación forzada inmediata y fallback por si el listener tarda
+        context.go('/home');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) context.go('/home');
+        });
       }
     }
   }
@@ -294,6 +320,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (success) {
       _showSnackBar('¡Bienvenido! Sesión demo iniciada.', AppColors.success);
+      context.go('/home');
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) context.go('/home');
+      });
     }
   }
 }

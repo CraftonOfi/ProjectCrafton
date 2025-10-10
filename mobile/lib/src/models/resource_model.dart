@@ -37,7 +37,8 @@ class ResourceModel {
     this.owner,
   });
 
-  factory ResourceModel.fromJson(Map<String, dynamic> json) => _$ResourceModelFromJson(json);
+  factory ResourceModel.fromJson(Map<String, dynamic> json) =>
+      _$ResourceModelFromJson(json);
   Map<String, dynamic> toJson() => _$ResourceModelToJson(this);
 
   ResourceModel copyWith({
@@ -75,14 +76,18 @@ class ResourceModel {
   }
 
   // Getters útiles
-  String get formattedPrice => '€${pricePerHour.toStringAsFixed(2)}/hora';
-  
+  String get formattedPrice {
+    final val = pricePerHour;
+    final s = val.toStringAsFixed(val.truncateToDouble() == val ? 0 : 2);
+    return '€$s/h';
+  }
+
   String get typeDisplayName => type.displayName;
-  
+
   String get primaryImage => images.isNotEmpty ? images.first : '';
-  
+
   bool get hasLocation => location != null && location!.isNotEmpty;
-  
+
   bool get hasImages => images.isNotEmpty;
 
   @override

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_stats_provider.dart';
+import '../../providers/notifications_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -427,6 +429,8 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildProfileOptions(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(notificationsProvider).unreadCount;
+    final user = ref.watch(authProvider).user;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -468,32 +472,55 @@ class ProfileScreen extends ConsumerWidget {
               _buildOptionTile(
                 context,
                 'Notificaciones',
-                'Configura tus preferencias de notificación',
+                'Revisa tus notificaciones',
                 Icons.notifications_outlined,
                 () {
-                  // TODO: Implementar configuración de notificaciones
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Funcionalidad en desarrollo'),
-                    ),
-                  );
+                  context.push('/notifications');
                 },
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (unread > 0)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        constraints: BoxConstraints(minWidth: 24.w),
+                        child: Center(
+                          child: Text(
+                            unread > 99 ? '99+' : unread.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w700,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    SizedBox(width: 8.w),
+                    Icon(
+                      Icons.chevron_right,
+                      color: AppColors.grey400,
+                      size: 20.sp,
+                    ),
+                  ],
+                ),
               ),
               Divider(height: 1.h),
-              _buildOptionTile(
-                context,
-                'Ayuda y Soporte',
-                'Obtén ayuda o contacta con nosotros',
-                Icons.help_outline,
-                () {
-                  // TODO: Implementar ayuda y soporte
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Funcionalidad en desarrollo'),
-                    ),
-                  );
-                },
-              ),
+              if (user?.email != 'demo@example.com')
+                _buildOptionTile(
+                  context,
+                  'Ayuda y Soporte',
+                  'Obtén ayuda o contacta con nosotros',
+                  Icons.help_outline,
+                  user?.role.isAdmin == true
+                      ? () => context.push('/admin/chat')
+                      : () => context.push('/chat'),
+                ),
             ],
           ),
         ),
@@ -506,8 +533,9 @@ class ProfileScreen extends ConsumerWidget {
     String title,
     String subtitle,
     IconData icon,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    Widget? trailing,
+  }) {
     return ListTile(
       leading: Container(
         width: 40.w,
@@ -541,11 +569,12 @@ class ProfileScreen extends ConsumerWidget {
               : AppColors.textSecondary,
         ),
       ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: AppColors.grey400,
-        size: 20.sp,
-      ),
+      trailing: trailing ??
+          Icon(
+            Icons.chevron_right,
+            color: AppColors.grey400,
+            size: 20.sp,
+          ),
       onTap: onTap,
     );
   }
@@ -561,25 +590,45 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _showLogoutDialog(WidgetRef ref) {
+    final isDark = Theme.of(ref.context).brightness == Brightness.dark;
     showDialog(
       context: ref.context,
       builder: (context) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
+        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        title: Text(
+          'Cerrar Sesión',
+          style: TextStyle(
+            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          '¿Estás seguro de que quieres cerrar sesión?',
+          style: TextStyle(
+            color:
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ),
+        actionsPadding: EdgeInsets.only(right: 8.w, bottom: 6.h),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
               ref.read(authProvider.notifier).logout();
             },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-            ),
-            child: const Text('Cerrar Sesión'),
+            child: const Text('Cerrar Sesión',
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
