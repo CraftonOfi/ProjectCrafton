@@ -325,7 +325,7 @@ class ResourceCard extends StatelessWidget {
         : shortened.toStringAsFixed(2);
     // Keep any non-numeric suffix from raw (e.g., ' m²')
     final unit = raw
-        .replaceFirst(RegExp(r'^\s*' + RegExp.escape(numeric) + '\s*'), '')
+        .replaceFirst(RegExp(r'^\s*' + RegExp.escape(numeric) + 's*'), '')
         .trim();
     final showUnit = unit.isNotEmpty ? ' $unit' : '';
     return '$str$suffix$showUnit';

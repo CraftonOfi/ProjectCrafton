@@ -13,15 +13,15 @@ final bookingsProvider = Provider<List<Map<String, dynamic>>>((ref) {
       'resourceName': 'Almacén Norte - Sector A',
       'price': 25.0,
       'startDate': DateTime.now(),
-      'endDate': DateTime.now().add(Duration(hours: 2)),
+      'endDate': DateTime.now().add(const Duration(hours: 2)),
     },
     {
       'id': '2',
       'status': 'pending',
       'resourceName': 'Máquina Láser Pro',
       'price': 40.0,
-      'startDate': DateTime.now().add(Duration(days: 1)),
-      'endDate': DateTime.now().add(Duration(days: 1, hours: 1)),
+      'startDate': DateTime.now().add(const Duration(days: 1)),
+      'endDate': DateTime.now().add(const Duration(days: 1, hours: 1)),
     },
   ];
 });
@@ -141,7 +141,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
             Container(
               width: 100.w,
               height: 100.w,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.grey100,
                 shape: BoxShape.circle,
               ),
@@ -242,7 +242,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                 ),
                 Text(
                   '€${(booking['price'] as double).toStringAsFixed(2)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
                   ),

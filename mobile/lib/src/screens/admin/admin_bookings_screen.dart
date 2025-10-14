@@ -54,7 +54,7 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen>
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
-          tabs: [
+          tabs: const [
             Tab(text: 'Todas'),
             Tab(text: 'Pendientes'),
             Tab(text: 'Activas'),
@@ -63,11 +63,13 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen>
           onTap: (i) {
             BookingStatus? s;
             if (i == 1) s = BookingStatus.pending;
-            if (i == 2)
+            if (i == 2) {
               s = BookingStatus.confirmed; // incluirá inProgress en UI
-            if (i == 3)
+            }
+            if (i == 3) {
               s = BookingStatus
                   .completed; // incluirá canceladas/refundadas en UI
+            }
             ref
                 .read(adminBookingsProvider.notifier)
                 .loadAll(refresh: true, status: s);
@@ -106,7 +108,7 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen>
       return Center(
         child: Padding(
           padding: EdgeInsets.all(24.w),
-          child: Text('Sin reservas para este filtro',
+          child: const Text('Sin reservas para este filtro',
               style: TextStyle(color: AppColors.textSecondary)),
         ),
       );
@@ -142,7 +144,7 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen>
                     children: [
                       bookingStatusChip(b.status),
                       Text(b.formattedPrice,
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               color: AppColors.primary)),
                     ],
@@ -172,7 +174,7 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen>
                     Expanded(
                       child: Text(
                         '${_fmt(b.startTime)} - ${_fmt(b.endTime)}',
-                        style: TextStyle(color: AppColors.textSecondary),
+                        style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     )
                   ]),

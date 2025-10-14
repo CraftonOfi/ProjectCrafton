@@ -113,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         SizedBox(height: 24.h),
         // Título de marca
         Text(
-          'CRAFTON',
+          'KRAFTON',
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: 2,
@@ -220,7 +220,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // Divider "o"
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Divider(
                   color: AppColors.grey300,
                   thickness: 1,
@@ -236,7 +236,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
               ),
-              Expanded(
+              const Expanded(
                 child: Divider(
                   color: AppColors.grey300,
                   thickness: 1,

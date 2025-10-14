@@ -128,9 +128,9 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
     }
     if (state.error != null) {
       return ListView(children: [
-        SizedBox(height: 120),
-        Icon(Icons.sms_failed_outlined, size: 64, color: Colors.grey),
-        SizedBox(height: 8),
+        const SizedBox(height: 120),
+        const Icon(Icons.sms_failed_outlined, size: 64, color: Colors.grey),
+        const SizedBox(height: 8),
         Center(
           child: Text(state.error!,
               textAlign: TextAlign.center,
@@ -140,9 +140,9 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
     }
     if (state.data == null || state.data!.isEmpty) {
       return ListView(children: [
-        SizedBox(height: 140),
-        Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
-        SizedBox(height: 12),
+        const SizedBox(height: 140),
+        const Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
+        const SizedBox(height: 12),
         Center(
             child: Text('Aún no hay datos',
                 style: Theme.of(context).textTheme.titleMedium)),
@@ -460,10 +460,11 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
                         label: Text(d == 365 ? '1 año' : '${d}d'),
                         selected: state.rangeDays == d,
                         onSelected: (sel) {
-                          if (sel)
+                          if (sel) {
                             ref
                                 .read(adminReportsProvider.notifier)
                                 .loadRange(d);
+                          }
                         },
                       ))
                   .toList(),
@@ -580,14 +581,14 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
 
   // --- Revenue card ---
   Widget _revenueRangeCard(BuildContext context, AdminSummaryState state) {
-    String _fmt2(dynamic v) => (v is num)
+    String fmt2(dynamic v) => (v is num)
         ? v.toStringAsFixed(2)
         : (num.tryParse('$v')?.toStringAsFixed(2) ?? '0.00');
-    final totalAll = _fmt2(state.data?['payments']?['revenueTotal'] ?? 0);
+    final totalAll = fmt2(state.data?['payments']?['revenueTotal'] ?? 0);
     final rawRange = (state.rangeData?['payments']?['revenue'] ?? 0) as num;
-    final revenueRange = _fmt2(rawRange);
+    final revenueRange = fmt2(rawRange);
     final avgPerDay =
-        state.rangeDays > 0 ? _fmt2(rawRange / state.rangeDays) : '0.00';
+        state.rangeDays > 0 ? fmt2(rawRange / state.rangeDays) : '0.00';
     final series =
         (state.rangeData?['payments']?['series'] as List?)?.cast<Map>() ??
             const [];
@@ -745,7 +746,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: Row(
                     children: [
-                      Icon(Icons.star_border_purple500_rounded,
+                      const Icon(Icons.star_border_purple500_rounded,
                           color: AppColors.accent),
                       SizedBox(width: 8.w),
                       Expanded(child: Text(r['name']?.toString() ?? '—')),
@@ -761,13 +762,13 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
 
   // --- Helpers ---
   void _openRevenueBreakdown(BuildContext context, Map payments, String title) {
-    String _fmt2(dynamic v) => (v is num)
+    String fmt2(dynamic v) => (v is num)
         ? v.toStringAsFixed(2)
         : (num.tryParse('$v')?.toStringAsFixed(2) ?? '0.00');
-    final total = _fmt2(payments['revenueTotal'] ?? 0);
-    final d30 = _fmt2(payments['revenueLast30Days'] ?? 0);
-    final d180 = _fmt2(payments['revenueLast180Days'] ?? 0);
-    final d365 = _fmt2(payments['revenueLast365Days'] ?? 0);
+    final total = fmt2(payments['revenueTotal'] ?? 0);
+    final d30 = fmt2(payments['revenueLast30Days'] ?? 0);
+    final d180 = fmt2(payments['revenueLast180Days'] ?? 0);
+    final d365 = fmt2(payments['revenueLast365Days'] ?? 0);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1117,7 +1118,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
     final buffer = StringBuffer();
     buffer.writeln('range_days,total,average_per_day,variation_pct');
     buffer.writeln(
-        '${rangeDays},${total.toStringAsFixed(2)},${avg.toStringAsFixed(2)},${variationPct.toStringAsFixed(1)}');
+        '$rangeDays,${total.toStringAsFixed(2)},${avg.toStringAsFixed(2)},${variationPct.toStringAsFixed(1)}');
     buffer.writeln();
     buffer.writeln('date,amount');
     for (final m in series) {

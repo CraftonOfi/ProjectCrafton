@@ -4,6 +4,10 @@ const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const sharp = require('sharp');
 
 // GET /api/users/profile - Obtener perfil del usuario autenticado
 router.get('/profile', authenticate, async (req, res) => {
@@ -74,6 +78,50 @@ router.put('/profile', authenticate, async (req, res) => {
     res.status(500).json({
       error: 'Error interno del servidor'
     });
+  }
+});
+
+// POST /api/users/avatar - Subir avatar seguro (re-encode)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+});
+
+router.post('/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
+
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+    // Re-encode con sharp para eliminar metadatos y payloads
+    const outFile = path.join(uploadsDir, `avatar_${req.user.id}.jpg`);
+    await sharp(req.file.buffer)
+      .rotate() // auto-orient
+      .resize(512, 512, { fit: 'cover' })
+      .jpeg({ quality: 82, chromaSubsampling: '4:2:0' })
+      .toFile(outFile);
+
+    // Guardar URL relativa en el usuario si existe el campo
+    let updatedUser = null;
+    try {
+      updatedUser = await prisma.user.update({
+        where: { id: req.user.id },
+        data: { avatarUrl: `/uploads/${path.basename(outFile)}` },
+        select: { id: true, email: true, name: true, phone: true, role: true, updatedAt: true }
+      });
+    } catch (_) {
+      // Si avatarUrl no existe en el esquema, devolvemos solo la ruta
+    }
+
+    res.json({
+      message: 'Avatar actualizado',
+      avatarUrl: `/uploads/${path.basename(outFile)}`,
+      ...(updatedUser ? { user: updatedUser } : {}),
+    });
+  } catch (e) {
+    console.error('Error subiendo avatar:', e);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 

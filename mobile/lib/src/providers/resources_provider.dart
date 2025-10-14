@@ -3,7 +3,6 @@ import 'package:logger/logger.dart';
 
 import '../models/resource_model.dart';
 import '../services/api_service.dart';
-import '../services/api_service.dart' show apiServiceProvider, ApiException;
 
 // Estado para la lista de recursos
 class ResourcesState {

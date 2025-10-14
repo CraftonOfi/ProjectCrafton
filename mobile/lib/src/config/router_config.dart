@@ -10,6 +10,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/home/search_screen.dart';
 import '../screens/resources/resource_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/edit_profile_screen.dart';
 import '../screens/booking/my_bookings_screen.dart';
 import '../screens/admin/manage_resources_screen.dart';
 import '../screens/admin/admin_bookings_screen.dart';
@@ -37,6 +38,7 @@ class AppRouterConfig {
   static const bookingPath = '/booking/:resourceId';
   static const bookingConfirmationPath = '/booking-confirmation/:bookingId';
   static const profilePath = '/profile';
+  static const editProfilePath = '/profile/edit';
   static const adminPath = '/admin';
   static const notificationsPath = '/notifications';
   static const chatPath = '/chat';
@@ -130,6 +132,11 @@ class AppRouterConfig {
             path: profilePath,
             name: 'profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: editProfilePath,
+            name: 'profile-edit',
+            builder: (context, state) => const EditProfileScreen(),
           ),
           GoRoute(
             path: notificationsPath,

@@ -6,6 +6,10 @@ const { sendPushToTokens } = require('../services/pushService');
 const { emitToUser } = require('../realtime');
 
 const router = express.Router();
+const multer = require('multer');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs');
 const prisma = new PrismaClient();
 
 // Helper: send in-app notif + push to recipient
@@ -33,18 +37,65 @@ router.get('/threads', authenticate, async (req, res) => {
     const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(me.role);
 
     if (isAdmin) {
-      // Group by counterpart user (parametrizado)
-      const rows = await prisma.$queryRaw`
-        SELECT u.id, u.name, u.email,
-               MAX(m.createdAt) as lastMessageAt,
-               SUM(CASE WHEN m.toUserId = ${me.id} AND m.read = 0 THEN 1 ELSE 0 END) as unread
-        FROM messages m
-        JOIN users u ON (CASE WHEN m.fromUserId = ${me.id} THEN m.toUserId ELSE m.fromUserId END) = u.id
-        WHERE (m.fromUserId = ${me.id} OR m.toUserId = ${me.id})
-        GROUP BY u.id, u.name, u.email
-        ORDER BY (lastMessageAt IS NULL), lastMessageAt DESC;
-      `;
-      return res.json({ threads: rows });
+      // Construimos threads desde los últimos mensajes, incluyendo preview y estado relativo a mí
+      const recent = await prisma.message.findMany({
+        where: {
+          OR: [ { fromUserId: me.id }, { toUserId: me.id } ]
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        select: { id: true, fromUserId: true, toUserId: true, createdAt: true, read: true, body: true }
+      });
+
+      const latestByCounterpart = new Map(); // counterpartId -> last message
+      const unreadByCounterpart = new Map(); // counterpartId -> count
+
+      for (const m of recent) {
+        const counterpartId = m.fromUserId === me.id ? m.toUserId : m.fromUserId;
+        if (!latestByCounterpart.has(counterpartId)) {
+          latestByCounterpart.set(counterpartId, m);
+        }
+        if (m.toUserId === me.id && !m.read) {
+          unreadByCounterpart.set(counterpartId, (unreadByCounterpart.get(counterpartId) || 0) + 1);
+        }
+      }
+
+      const ids = Array.from(latestByCounterpart.keys());
+      const users = ids.length
+        ? await prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, email: true, role: true }
+          })
+        : [];
+      const threads = users
+        .map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          lastMessageAt: (latestByCounterpart.get(u.id) || {}).createdAt || null,
+          lastMessagePreview: (latestByCounterpart.get(u.id) || {}).body || '',
+          lastMessageDirection: (() => {
+            const m = latestByCounterpart.get(u.id);
+            if (!m) return null;
+            return m.fromUserId === me.id ? 'out' : 'in';
+          })(),
+          lastMessageStatus: (() => {
+            const m = latestByCounterpart.get(u.id);
+            if (!m) return null;
+            // Para mensajes salientes: read ? 'read' : 'sent'
+            if (m.fromUserId === me.id) return m.read ? 'read' : 'sent';
+            // Para entrantes, si existen no leídos contarlos, si no, 'received'
+            return (unreadByCounterpart.get(u.id) || 0) > 0 ? 'unread' : 'received';
+          })(),
+          unread: unreadByCounterpart.get(u.id) || 0,
+        }))
+        .sort((a, b) => {
+          const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+          const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      return res.json({ threads });
     }
 
     // Client: find last counterpart admin
@@ -73,7 +124,8 @@ router.get('/threads', authenticate, async (req, res) => {
     return res.json({ threads });
   } catch (e) {
     console.error('[chat.threads] error', e);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    // Fallback seguro
+    res.json({ threads: [] });
   }
 });
 
@@ -115,6 +167,11 @@ router.get('/messages', authenticate, async (req, res) => {
       take: limit,
       include: { attachments: true },
     });
+    // Marcar como leídos los que van hacia mí en el rango retornado
+    await prisma.message.updateMany({
+      where: { ...where, toUserId: me.id, read: false },
+      data: { read: true }
+    });
     // return ascending to display naturally
     messages.reverse();
     res.json({
@@ -123,7 +180,9 @@ router.get('/messages', authenticate, async (req, res) => {
     });
   } catch (e) {
     console.error('[chat.messages] error', e);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    // Respuesta segura para evitar romper la UI si hay un problema puntual
+    const page = 1, limit = 30;
+    res.status(200).json({ messages: [], pagination: { page, limit, total: 0, pages: 1 } });
   }
 });
 
@@ -228,6 +287,38 @@ router.put('/messages/:id/read', authenticate, async (req, res) => {
   } catch (e) {
     console.error('[chat.read] error', e);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// POST /api/chat/upload - subir archivo de chat (imagen/pdf) con limpieza
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
+    const mime = req.file.mimetype || '';
+    const isImage = mime.startsWith('image/');
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+    let filename;
+    if (isImage) {
+      filename = `chat_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+      await sharp(req.file.buffer)
+        .rotate()
+        .resize(1600, 1600, { fit: 'inside' })
+        .jpeg({ quality: 82, chromaSubsampling: '4:2:0' })
+        .toFile(path.join(uploadsDir, filename));
+    } else {
+      // Para no imágenes, guardamos como binario directo con extensión segura
+      const safeExt = mime === 'application/pdf' ? 'pdf' : 'bin';
+      filename = `chat_${Date.now()}_${Math.random().toString(36).slice(2)}.${safeExt}`;
+      fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
+    }
+
+    return res.json({ url: `/uploads/${filename}`, type: isImage ? 'image/jpeg' : mime });
+  } catch (e) {
+    console.error('[chat.upload] error', e);
+    res.status(500).json({ error: 'Error subiendo archivo' });
   }
 });
 

@@ -97,7 +97,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                             Expanded(
                               child: Text(
                                 state.error!,
-                                style: TextStyle(color: AppColors.warning),
+                                style: const TextStyle(color: AppColors.warning),
                               ),
                             ),
                             TextButton(

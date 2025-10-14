@@ -35,8 +35,7 @@ class ProfileScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: () {
-              // TODO: Navegar a edición de perfil
-              // context.push('/profile/edit');
+              context.push('/profile/edit');
             },
           ),
         ],
@@ -78,7 +77,7 @@ class ProfileScreen extends ConsumerWidget {
       width: double.infinity,
       padding: EdgeInsets.all(24.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
@@ -453,10 +452,7 @@ class ProfileScreen extends ConsumerWidget {
                 'Editar Perfil',
                 'Actualiza tu información personal',
                 Icons.edit_outlined,
-                () {
-                  // TODO: Navegar a edición de perfil
-                  // context.push('/profile/edit');
-                },
+                () => context.push('/profile/edit'),
               ),
               Divider(height: 1.h),
               _buildOptionTile(

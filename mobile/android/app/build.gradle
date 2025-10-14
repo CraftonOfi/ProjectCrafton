@@ -1,6 +1,6 @@
 plugins {
     id "com.android.application"
-    id "kotlin-android"
+    id "org.jetbrains.kotlin.android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
@@ -11,12 +11,12 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = '17'
     }
 
     defaultConfig {
@@ -37,8 +37,47 @@ android {
             signingConfig = signingConfigs.debug
         }
     }
+
+    // No excluir 'io/flutter/plugins/**' para permitir compilar GeneratedPluginRegistrant.java
 }
 
 flutter {
     source = "../.."
 }
+
+dependencies {
+    debugImplementation files("$buildDir/intermediates/flutter/debug/libs.jar")
+    profileImplementation files("$buildDir/intermediates/flutter/profile/libs.jar")
+    releaseImplementation files("$buildDir/intermediates/flutter/release/libs.jar")
+
+    // Embedding de Flutter explícito (según engine hash del log)
+    debugImplementation "io.flutter:flutter_embedding_debug:1.0.0-36335019a8eab588c3c2ea783c618d90505be233"
+    profileImplementation "io.flutter:flutter_embedding_profile:1.0.0-36335019a8eab588c3c2ea783c618d90505be233"
+    releaseImplementation "io.flutter:flutter_embedding_release:1.0.0-36335019a8eab588c3c2ea783c618d90505be233"
+}
+
+afterEvaluate {
+    // Asegura que el embedding (libs.jar) esté generado antes de compilar
+    tasks.matching { it.name == 'compileFlutterBuildDebug' || it.name == 'compileFlutterBuildProfile' || it.name == 'compileFlutterBuildRelease' }.configureEach {
+        // no-op, sólo para asegurar existencia
+    }
+    tasks.matching { it.name == 'compileDebugJavaWithJavac' }.configureEach {
+        dependsOn 'compileFlutterBuildDebug'
+    }
+    tasks.matching { it.name == 'compileDebugKotlin' }.configureEach {
+        dependsOn 'compileFlutterBuildDebug'
+    }
+    tasks.matching { it.name == 'compileProfileJavaWithJavac' }.configureEach {
+        dependsOn 'compileFlutterBuildProfile'
+    }
+    tasks.matching { it.name == 'compileProfileKotlin' }.configureEach {
+        dependsOn 'compileFlutterBuildProfile'
+    }
+    tasks.matching { it.name == 'compileReleaseJavaWithJavac' }.configureEach {
+        dependsOn 'compileFlutterBuildRelease'
+    }
+    tasks.matching { it.name == 'compileReleaseKotlin' }.configureEach {
+        dependsOn 'compileFlutterBuildRelease'
+    }
+}
+

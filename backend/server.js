@@ -7,6 +7,7 @@ const pinoHttp = require('pino-http');
 const { randomUUID } = require('crypto');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 const client = require('prom-client');
 const { PrismaClient } = require('@prisma/client');
@@ -79,6 +80,8 @@ app.use('/api/', limiter);
 // Middleware para parsing JSON
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+// Servir uploads (avatars, etc.) de forma estática
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Rutas principales
 app.use('/api/auth', authRoutes);

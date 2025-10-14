@@ -58,9 +58,9 @@ Future<void> main() async {
       o.sendDefaultPii = false;
     },
     appRunner: () => runApp(
-      ProviderScope(
+      const ProviderScope(
         observers: [SentryRiverpodObserver()],
-        child: const MyApp(),
+        child: MyApp(),
       ),
     ),
   );

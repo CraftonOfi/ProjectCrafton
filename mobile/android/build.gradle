@@ -1,23 +1,57 @@
 plugins {
     id "com.android.application" version "8.1.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.9.10" apply false
+    id "org.jetbrains.kotlin.android" version "2.2.0" apply false
     id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
 }
+
+// Provee valores para plugins que esperan ext.flutter (compatibilidad)
+ext {
+    flutter = [
+        compileSdkVersion: 35,
+        targetSdkVersion : 35,
+        minSdkVersion    : 23
+    ]
+}
+
 
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
     }
 }
 
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
+
+    afterEvaluate { p ->
+        def hasAndroid = p.plugins.hasPlugin('com.android.application') || p.plugins.hasPlugin('com.android.library')
+        if (hasAndroid) {
+            def androidExt = p.extensions.findByName('android')
+            if (androidExt != null) {
+                // Asegura Java 17 en todos los módulos Android
+                androidExt.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
+                androidExt.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+                if (androidExt.hasProperty('kotlinOptions') && androidExt.kotlinOptions != null) {
+                    androidExt.kotlinOptions.jvmTarget = '17'
+                }
+            }
+        }
+        // Para proyectos Kotlin puros
+        p.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
+            task.kotlinOptions.jvmTarget = '17'
+            if (task.kotlinOptions.hasProperty('languageVersion')) {
+                task.kotlinOptions.languageVersion = '2.0'
+            }
+            if (task.kotlinOptions.hasProperty('apiVersion')) {
+                task.kotlinOptions.apiVersion = '2.0'
+            }
+        }
+    }
 }
-subprojects {
-    project.evaluationDependsOn(":app")
-}
+
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir

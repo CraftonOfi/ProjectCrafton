@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'api_service.dart';
 
 class ChatService {
@@ -42,6 +44,37 @@ class ChatService {
 
   Future<void> markRead(int messageId) async {
     await _api.put('/chat/messages/$messageId/read');
+  }
+
+  Future<Map<String, dynamic>> uploadAttachment(List<int> bytes,
+      {required String filename, required String mimeType}) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes,
+          filename: filename, contentType: MediaType.parse(mimeType)),
+    });
+    final resp = await _api.dio.post('/chat/upload',
+        data: formData, options: Options(contentType: 'multipart/form-data'));
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw ApiException('Error subiendo archivo');
+    }
+    return resp.data as Map<String, dynamic>;
+  }
+
+  // Resuelve rutas relativas (p.ej. "/uploads/...") a URLs absolutas basadas en API_BASE_URL
+  String resolveUrl(String input) {
+    if (input.startsWith('http://') || input.startsWith('https://')) {
+      return input;
+    }
+    final base = _api.dio.options.baseUrl; // p.ej. http://127.0.0.1:3001/api
+    Uri? u;
+    try {
+      u = Uri.tryParse(base);
+    } catch (_) {}
+    if (u == null) return input;
+    final origin =
+        '${u.scheme}://${u.host}${(u.hasPort && u.port != 0) ? ':${u.port}' : ''}';
+    if (input.startsWith('/')) return origin + input;
+    return '$origin/$input';
   }
 }
 

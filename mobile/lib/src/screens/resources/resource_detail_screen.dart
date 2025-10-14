@@ -72,7 +72,7 @@ class ResourceDetailScreen extends ConsumerWidget {
                               SizedBox(width: 4.w),
                               Text(
                                 resource.formattedPrice,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.primary,
                                 ),
@@ -181,24 +181,20 @@ String _abbreviateMetric(String raw) {
   if (value == null) return raw;
   if (value >= 1000000) {
     final s = value / 1000000;
-    return _trimZeros(s >= 10 ? s.toStringAsFixed(0) : s.toStringAsFixed(2)) +
-        'M' +
-        _suffix(raw, numeric);
+    return '${_trimZeros(s >= 10 ? s.toStringAsFixed(0) : s.toStringAsFixed(2))}M${_suffix(raw, numeric)}';
   }
   if (value >= 1000) {
     final s = value / 1000;
-    return _trimZeros(s >= 10 ? s.toStringAsFixed(0) : s.toStringAsFixed(2)) +
-        'k' +
-        _suffix(raw, numeric);
+    return '${_trimZeros(s >= 10 ? s.toStringAsFixed(0) : s.toStringAsFixed(2))}k${_suffix(raw, numeric)}';
   }
   return _trimZeros(value.toStringAsFixed(2)) + _suffix(raw, numeric);
 }
 
 String _suffix(String raw, String numeric) {
   final unit = raw
-      .replaceFirst(RegExp('^\\s*' + RegExp.escape(numeric) + '\\s*'), '')
+      .replaceFirst(RegExp('^\\s*${RegExp.escape(numeric)}\\s*'), '')
       .trim();
-  return unit.isNotEmpty ? ' ' + unit : '';
+  return unit.isNotEmpty ? ' $unit' : '';
 }
 
 String _trimZeros(String s) {

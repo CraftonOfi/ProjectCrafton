@@ -8,6 +8,9 @@ class ThreadSummary {
   final String role;
   final DateTime? lastMessageAt;
   final int unread;
+  final String? lastMessagePreview; // texto del último mensaje
+  final String? lastMessageDirection; // 'in' | 'out'
+  final String? lastMessageStatus; // 'sent' | 'received' | 'read' | 'unread'
   ThreadSummary({
     required this.id,
     required this.name,
@@ -15,6 +18,9 @@ class ThreadSummary {
     required this.role,
     required this.lastMessageAt,
     required this.unread,
+    this.lastMessagePreview,
+    this.lastMessageDirection,
+    this.lastMessageStatus,
   });
   factory ThreadSummary.fromJson(Map<String, dynamic> j) => ThreadSummary(
         id: (j['id'] as num).toInt(),
@@ -25,6 +31,9 @@ class ThreadSummary {
             ? DateTime.tryParse(j['lastMessageAt'].toString())
             : null,
         unread: (j['unread'] ?? 0) is num ? (j['unread'] as num).toInt() : 0,
+        lastMessagePreview: j['lastMessagePreview'] as String?,
+        lastMessageDirection: j['lastMessageDirection'] as String?,
+        lastMessageStatus: j['lastMessageStatus'] as String?,
       );
 }
 
@@ -133,6 +142,22 @@ class ThreadsNotifier extends StateNotifier<ThreadsState> {
       state = state.copyWith(loading: false, error: e.toString());
     }
   }
+
+  void setUnread(int counterpartId, int unread) {
+    final updated = state.threads
+        .map((t) => t.id == counterpartId
+            ? ThreadSummary(
+                id: t.id,
+                name: t.name,
+                email: t.email,
+                role: t.role,
+                lastMessageAt: t.lastMessageAt,
+                unread: unread,
+              )
+            : t)
+        .toList();
+    state = state.copyWith(threads: updated);
+  }
 }
 
 class MessagesNotifier extends StateNotifier<MessagesState> {
@@ -166,6 +191,22 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
     try {
       final resp =
           await _chat.sendMessage(toUserId: counterpartId, message: message);
+      final created = ChatMessage.fromJson(
+          (resp['message'] as Map).cast<String, dynamic>());
+      state = state.copyWith(messages: [...state.messages, created]);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> sendWithAttachments(
+      String message, List<MessageAttachment> atts) async {
+    try {
+      final payload = atts
+          .map((a) => {'url': a.url, if (a.type != null) 'type': a.type!})
+          .toList();
+      final resp = await _chat.sendMessage(
+          toUserId: counterpartId, message: message, attachments: payload);
       final created = ChatMessage.fromJson(
           (resp['message'] as Map).cast<String, dynamic>());
       state = state.copyWith(messages: [...state.messages, created]);

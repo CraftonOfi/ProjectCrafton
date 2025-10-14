@@ -64,8 +64,8 @@ class ApiService {
                 : 'http://10.0.2.2:3001/api',
           ),
           headers: {'Content-Type': 'application/json'},
-          connectTimeout: Duration(seconds: 5),
-          receiveTimeout: Duration(seconds: 3),
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 3),
           // Permitimos que Dio no lance excepción automáticamente para capturar cuerpo de error
           validateStatus: (int? status) =>
               status != null && status >= 200 && status < 500,
@@ -84,102 +84,128 @@ class ApiService {
       return handler.next(e);
     }));
 
-    // Automatic local-dev fallback: if baseUrl uses :3001 and a network error occurs,
-    // switch to :3002 and retry the request once. Helps when backend moved to 3002.
-    dio.interceptors.add(InterceptorsWrapper(onError: (e, handler) async {
-      // Retry discreto para GET una vez
-      final isGet = e.requestOptions.method.toUpperCase() == 'GET';
-      final alreadyRetried = e.requestOptions.extra['retriedOnce'] == true;
-      final isNetworkError =
-          e.response == null && e.type != DioExceptionType.badResponse;
-      if (isGet && isNetworkError && !alreadyRetried) {
-        try {
-          await Future.delayed(const Duration(milliseconds: 250));
-          final req = e.requestOptions;
-          final resp = await dio.request(
-            req.path,
-            data: req.data,
-            queryParameters: req.queryParameters,
-            options: Options(
-              method: req.method,
-              headers: req.headers,
-              responseType: req.responseType,
-              extra: {...req.extra, 'retriedOnce': true},
-            ),
-            cancelToken: req.cancelToken,
-          );
-          return handler.resolve(resp);
-        } catch (_) {}
-      }
-      final isNetworkError2 =
-          e.response == null && e.type != DioExceptionType.badResponse;
-      final alreadyRetriedFallback =
-          e.requestOptions.extra['retriedWithFallback'] == true;
-      if (isNetworkError2 && !alreadyRetriedFallback) {
-        try {
-          final current = dio.options.baseUrl;
-          final uri = Uri.tryParse(current);
-          if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-            final hosts = <String>{
-              uri.host,
-              '127.0.0.1',
-              'localhost',
-              '10.0.2.2'
-            };
-            final ports = <int>{
-              uri.port == 0 ? (uri.scheme == 'https' ? 443 : 80) : uri.port,
-              3001,
-              3002
-            };
-            // Build candidate baseUrls excluding current
-            final candidates = <Uri>[];
-            for (final h in hosts) {
-              for (final p in ports) {
-                final candidate = uri.replace(host: h, port: p);
-                if (candidate.toString() != current &&
-                    !candidates.contains(candidate)) {
-                  candidates.add(candidate);
+    // Idempotency + retries con backoff + fallback local-dev.
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final method = options.method.toUpperCase();
+        final isMutating = method == 'POST' ||
+            method == 'PUT' ||
+            method == 'PATCH' ||
+            method == 'DELETE';
+        if (isMutating && options.headers['Idempotency-Key'] == null) {
+          options.headers['Idempotency-Key'] = _generateIdempotencyKey(options);
+        }
+        options.extra['retryCount'] ??= 0;
+        return handler.next(options);
+      },
+      onError: (e, handler) async {
+        final req = e.requestOptions;
+        final method = req.method.toUpperCase();
+        final isIdempotent =
+            method == 'GET' || req.headers.containsKey('Idempotency-Key');
+        final status = e.response?.statusCode;
+        final isNetworkError =
+            e.response == null && e.type != DioExceptionType.badResponse;
+        final isRetryableStatus =
+            status != null && status >= 500 && status < 600;
+        final currentRetries = (req.extra['retryCount'] as int? ?? 0);
+        const maxRetries = 2;
+
+        // 1) Retries con backoff para solicitudes idempotentes
+        if (isIdempotent &&
+            currentRetries < maxRetries &&
+            (isNetworkError || isRetryableStatus)) {
+          try {
+            final delayMs = 250 * (1 << currentRetries); // 250ms, 500ms
+            await Future.delayed(Duration(milliseconds: delayMs));
+            final response = await dio.request(
+              req.path,
+              data: req.data,
+              queryParameters: req.queryParameters,
+              options: Options(
+                method: req.method,
+                headers: req.headers,
+                responseType: req.responseType,
+                contentType: req.contentType,
+                followRedirects: req.followRedirects,
+                receiveDataWhenStatusError: req.receiveDataWhenStatusError,
+                extra: {...req.extra, 'retryCount': currentRetries + 1},
+              ),
+              cancelToken: req.cancelToken,
+              onReceiveProgress: req.onReceiveProgress,
+              onSendProgress: req.onSendProgress,
+            );
+            return handler.resolve(response);
+          } catch (_) {
+            // continue to fallback
+          }
+        }
+
+        // 2) Fallback local-dev: alterna host/puerto si es error de red y aún no probamos fallback
+        final alreadyRetriedFallback = req.extra['retriedWithFallback'] == true;
+        if (isNetworkError && !alreadyRetriedFallback) {
+          try {
+            final current = dio.options.baseUrl;
+            final uri = Uri.tryParse(current);
+            if (uri != null &&
+                (uri.scheme == 'http' || uri.scheme == 'https')) {
+              final hosts = <String>{
+                uri.host,
+                '127.0.0.1',
+                'localhost',
+                '10.0.2.2'
+              };
+              final ports = <int>{
+                uri.port == 0 ? (uri.scheme == 'https' ? 443 : 80) : uri.port,
+                3001,
+                3002,
+              };
+              final candidates = <Uri>[];
+              for (final h in hosts) {
+                for (final p in ports) {
+                  final candidate = uri.replace(host: h, port: p);
+                  if (candidate.toString() != current &&
+                      !candidates.contains(candidate)) {
+                    candidates.add(candidate);
+                  }
+                }
+              }
+
+              for (final cand in candidates) {
+                try {
+                  dio.options.baseUrl = cand.toString();
+                  final response = await dio.request(
+                    req.path,
+                    data: req.data,
+                    queryParameters: req.queryParameters,
+                    options: Options(
+                      method: req.method,
+                      headers: req.headers,
+                      contentType: req.contentType,
+                      responseType: req.responseType,
+                      followRedirects: req.followRedirects,
+                      receiveDataWhenStatusError:
+                          req.receiveDataWhenStatusError,
+                      extra: {...req.extra, 'retriedWithFallback': true},
+                    ),
+                    cancelToken: req.cancelToken,
+                    onReceiveProgress: req.onReceiveProgress,
+                    onSendProgress: req.onSendProgress,
+                  );
+                  return handler.resolve(response);
+                } catch (_) {
+                  // probar siguiente candidato
                 }
               }
             }
-
-            final req = e.requestOptions;
-            for (final cand in candidates) {
-              try {
-                dio.options.baseUrl = cand.toString();
-                final opts = Options(
-                  method: req.method,
-                  headers: req.headers,
-                  contentType: req.contentType,
-                  responseType: req.responseType,
-                  followRedirects: req.followRedirects,
-                  receiveDataWhenStatusError: req.receiveDataWhenStatusError,
-                  extra: {
-                    ...req.extra,
-                    'retriedWithFallback': true,
-                  },
-                );
-                final response = await dio.request(
-                  req.path,
-                  data: req.data,
-                  queryParameters: req.queryParameters,
-                  options: opts,
-                  cancelToken: req.cancelToken,
-                  onReceiveProgress: req.onReceiveProgress,
-                  onSendProgress: req.onSendProgress,
-                );
-                return handler.resolve(response);
-              } catch (_) {
-                // try next candidate
-              }
-            }
+          } catch (_) {
+            // ignora y propaga error original
           }
-        } catch (_) {
-          // ignore and forward original error
         }
-      }
-      return handler.next(e);
-    }));
+
+        return handler.next(e);
+      },
+    ));
   }
 
   void setToken(String? token) {
@@ -241,6 +267,20 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> uploadAvatarBytes(List<int> bytes,
+      {String filename = 'avatar.jpg'}) async {
+    try {
+      final formData = FormData.fromMap({
+        'avatar': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await dio.post('/users/avatar',
+          data: formData, options: Options(contentType: 'multipart/form-data'));
+      return _standardizeSuccess(response.data);
+    } on DioException catch (e) {
+      return _standardizeError(e);
+    }
+  }
+
   // Métodos genéricos para recursos
   Future<Response> get(String endpoint,
       {Map<String, dynamic>? queryParameters}) async {
@@ -281,6 +321,12 @@ final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
 // ===================== Helpers de normalización =====================
 extension _ApiResponseHelpers on ApiService {
+  String _generateIdempotencyKey(RequestOptions options) {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final rnd = Object().hashCode ^ options.path.hashCode ^ ts;
+    return 'idem-$ts-$rnd';
+  }
+
   Map<String, dynamic> _standardizeSuccess(Map<String, dynamic> data) {
     // Si ya trae success explícito lo respetamos
     if (data.containsKey('success')) return data;

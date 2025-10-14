@@ -294,7 +294,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (!state.isAuthenticated) return;
       final container = ProviderContainer();
       final pushSvc = container.read(pushRegistrationServiceProvider);
-      final fcmService = const FcmService();
+      const fcmService = FcmService();
       final token = await fcmService.requestToken();
       if (token == null) return; // nada que registrar
       final platform = defaultTargetPlatform.name.toLowerCase();
@@ -329,6 +329,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (e) {
       _logger.w('Error actualizando datos de usuario: $e');
+    }
+  }
+
+  // Subir avatar seguro (el backend re-encoda y limpia metadatos)
+  Future<String?> uploadAvatarBytes(List<int> bytes,
+      {String filename = 'avatar.jpg'}) async {
+    if (!state.isAuthenticated) return null;
+    try {
+      final result =
+          await _apiService.uploadAvatarBytes(bytes, filename: filename);
+      if (result['success'] == true) {
+        final avatarUrl = result['avatarUrl'] as String?;
+        // Si el backend devuelve user actualizado, aplicarlo
+        if (result['user'] is Map<String, dynamic>) {
+          final updatedUser = UserModel.fromJson(
+              _normalizeUserJson(result['user'] as Map<String, dynamic>));
+          await StorageService.saveUser(updatedUser);
+          state = state.copyWith(user: updatedUser);
+        }
+        return avatarUrl;
+      }
+      return null;
+    } catch (e) {
+      _logger.w('Error subiendo avatar: $e');
+      return null;
     }
   }
 

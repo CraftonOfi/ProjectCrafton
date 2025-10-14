@@ -342,7 +342,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ),
               calendarStyle: CalendarStyle(
                 outsideDaysVisible: false,
-                selectedDecoration: BoxDecoration(
+                selectedDecoration: const BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
@@ -350,10 +350,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   color: AppColors.primary.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
-                weekendTextStyle: TextStyle(
+                weekendTextStyle: const TextStyle(
                   color: AppColors.textSecondary,
                 ),
-                disabledTextStyle: TextStyle(
+                disabledTextStyle: const TextStyle(
                   color: AppColors.grey400,
                 ),
               ),
@@ -724,7 +724,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     if (picked != null) {
       setState(() {
-        toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+        int toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
         if (isStartTime) {
           _startTime = picked;
           if (_endTime != null && toMinutes(_endTime!) <= toMinutes(picked)) {

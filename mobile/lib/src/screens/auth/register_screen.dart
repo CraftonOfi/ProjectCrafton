@@ -274,8 +274,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   fontSize: 14.sp,
                   color: AppColors.textSecondary,
                 ),
-                children: [
-                  const TextSpan(text: 'Acepto los '),
+                children: const [
+                  TextSpan(text: 'Acepto los '),
                   TextSpan(
                     text: 'términos y condiciones',
                     style: TextStyle(
@@ -283,7 +283,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const TextSpan(text: ' y la '),
+                  TextSpan(text: ' y la '),
                   TextSpan(
                     text: 'política de privacidad',
                     style: TextStyle(

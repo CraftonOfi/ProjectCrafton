@@ -40,7 +40,7 @@ const authenticate = async (req, res, next) => {
     console.error('Error en autenticación:', error);
     res.status(500).json({ error: 'Error interno del servidor', details: error.message });
   } finally {
-    await prisma.$disconnect();
+    // No desconectar Prisma por request. Mantener la conexión viva durante el proceso.
   }
 };
 

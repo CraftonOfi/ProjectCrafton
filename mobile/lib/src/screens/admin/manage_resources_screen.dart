@@ -94,7 +94,7 @@ class _ManageResourcesScreenState extends ConsumerState<ManageResourcesScreen>
       return Center(
         child: Padding(
           padding: EdgeInsets.all(24.w),
-          child: Text('Aún no hay recursos, crea el primero.',
+          child: const Text('Aún no hay recursos, crea el primero.',
               style: TextStyle(color: AppColors.textSecondary)),
         ),
       );

@@ -501,7 +501,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      CircularProgressIndicator(color: AppColors.primary),
+                      const CircularProgressIndicator(color: AppColors.primary),
                       SizedBox(height: 8.h),
                       Text(
                         'Cargando más recursos...',
@@ -525,10 +525,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             location: _selectedLocation,
                           ),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.primary),
+                    side: const BorderSide(color: AppColors.primary),
                     foregroundColor: AppColors.primary,
                   ),
-                  child: Text('Cargar más recursos'),
+                  child: const Text('Cargar más recursos'),
                 ),
               );
             }
@@ -602,10 +602,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 _applyFilters();
               },
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppColors.primary),
+                side: const BorderSide(color: AppColors.primary),
                 foregroundColor: AppColors.primary,
               ),
-              child: Text('Limpiar filtros'),
+              child: const Text('Limpiar filtros'),
             ),
           ],
         ),
@@ -696,7 +696,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        final types = ResourceType.values;
+        const types = ResourceType.values;
         final allLocations = <String>{...dynamicLocations, ..._multiLocations};
         return StatefulBuilder(
           builder: (context, setModalState) {

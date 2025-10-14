@@ -253,7 +253,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
             Container(
               width: 100.w,
               height: 100.w,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.grey100,
                 shape: BoxShape.circle,
               ),
@@ -445,7 +445,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
           child: OutlinedButton(
             onPressed: () => _showBookingDetails(booking),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.primary),
+              side: const BorderSide(color: AppColors.primary),
               foregroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.r),
